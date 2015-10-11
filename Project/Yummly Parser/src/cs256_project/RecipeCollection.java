@@ -23,16 +23,20 @@ public class RecipeCollection {
 			return;
 		}
 		
+		RecipeCollection col = RecipeCollection.getRecipeCollection(args[0]);
 		
+		int i = 1;
 		
 	}
 
-	public static RecipeCollection getRecipeCollection(File filePath){
+	public static RecipeCollection getRecipeCollection(String filePath){
+		
+		File file = new File(filePath);
 		
 		//----- Once the file extension has been verified, try opening the file.
 		Scanner fileIn;
 		try{
-			fileIn = new Scanner(new FileReader(filePath));
+			fileIn = new Scanner(new FileReader(file));
 		}
 		catch(FileNotFoundException e){
 			JOptionPane.showMessageDialog(null, "No file with the specified name exists.  Please specify a valid file and try again.");
@@ -50,48 +54,50 @@ public class RecipeCollection {
 			line = fileIn.nextLine();
 			// Check if the StringBuffer needs to be cleared.
 			if(line.indexOf(RECORD_START_CHAR) > 0 ) recipeInfo.setLength(0);
+			
 			// Append line to the String Buffer
 			recipeInfo.append(line);
+			
 			// Find the end of the record
 			if(line.indexOf(RECORD_END_CHAR) > 0 ){
 				line = line.replace("},", "}");
 				recipeInfo.append(line);
 				Recipe newRecipe = Recipe.getRecipe(recipeInfo.toString());
 				// Check for bad records.
-				if(newRecipe == null)
+				if(newRecipe == null){
 					tempRC.badRecordCount++; // Increment the bad record counter
-				else{
-					
-					// Add new recipe to the list
-					tempRC.allRecipes.put(newRecipe.getID(), newRecipe);
-					
-					// Update recipe frequency count
-					int cuisineTypeCount;
-					String tempType = newRecipe.getCuisineType();
-					if(tempRC.cuisineTypes.containsKey(tempType))
-						cuisineTypeCount = tempRC.cuisineTypes.get(tempType).intValue() + 1; 
-					else cuisineTypeCount = 1;
-					// Update the cuisine type count in the hashtable
-					tempRC.cuisineTypes.put(tempType, cuisineTypeCount);
-					
-					// Update recipe frequency count
-					String[] recipeIngredients = newRecipe.getIngredients();
-					for(String ingredient : recipeIngredients){
-						int ingredientCount;
-						if(tempRC.cuisineTypes.containsKey(tempType))
-							ingredientCount = tempRC.allIngredients.get(ingredient).intValue() + 1; 
-						else ingredientCount = 1;
-						// Update the ingredients hash table
-						tempRC.allIngredients.put(ingredient, ingredientCount);
-					}
-					
+					continue; // Return to the next while loop.
 				}
-			}
-			
-		}
+
+				// Add new recipe to the list
+				tempRC.allRecipes.put(newRecipe.getID(), newRecipe);
+				
+				// Update recipe frequency count
+				int cuisineTypeCount;
+				String tempType = newRecipe.getCuisineType();
+				if(tempRC.cuisineTypes.containsKey(tempType))
+					cuisineTypeCount = tempRC.cuisineTypes.get(tempType).intValue() + 1; 
+				else cuisineTypeCount = 1;
+				// Update the cuisine type count in the hashtable
+				tempRC.cuisineTypes.put(tempType, cuisineTypeCount);
+				
+				// Update recipe frequency count
+				String[] recipeIngredients = newRecipe.getIngredients();
+				for(String ingredient : recipeIngredients){
+					int ingredientCount;
+					if(tempRC.cuisineTypes.containsKey(tempType))
+						ingredientCount = tempRC.allIngredients.get(ingredient).intValue() + 1; 
+					else ingredientCount = 1;
+					// Update the ingredients hash table
+					tempRC.allIngredients.put(ingredient, ingredientCount);
+				}
+			} //if(line.indexOf(RECORD_END_CHAR) > 0 )
+		} //while(fileIn.hasNextLine())
+		
+		fileIn.close(); // Close the scanner
+		return tempRC;	// Return the collection of recipe information.
 	}
 
-	
 }
 
 

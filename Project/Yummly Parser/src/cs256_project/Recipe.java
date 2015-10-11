@@ -4,23 +4,78 @@ import java.util.ArrayList;
 
 public class Recipe {
 
-	private ArrayList<String> ingredients;
+	private ArrayList<String> ingredients = new ArrayList<String>();
 	private int id;
 	private String type;
 	
-	private final String ID_LINE_KEY = "\"id\":";
-	private final String CUISINE_LINE_KEY = "\"CUISINE\":";
-	private String INGREDIENTS_START_KEY = "[";
-	private String INGREDIENTS_END_KEY = "[";
+	private static final String ID_LINE_KEY = "\"id\":";
+	private static final String CUISINE_LINE_KEY = "\"CUISINE\":";
+	private static final String INGREDIENTS_START_KEY = "[";
+	private static final String INGREDIENTS_END_KEY = "[";
 	
 	
+	/**
+	 * Hidden constructor.  Must use the FactoryMethod to get ingredients.
+	 */
+	private Recipe(){
+		id = -1;
+		type = "UNINITIALIZED";
+	}
 	
+	/**
+	 * This method uses the FactoryMethod pattern to generate recipes.  
+	 * The method is passed a string that contains the information of a Recipe 
+	 * record.  If the string can be successfully parsed, it returns a Recipe object.
+	 * Otherwise it returns false.
+	 * 
+	 * @param recordInfo 	String containing a Recipe record's information
+	 * @return 				A Recipe record if the information is valid and null otherwise.
+	 */
 	public static Recipe getRecipe(String recordInfo){
+		
+		Recipe tempRecipe = new Recipe();
+		
+		// Extract the record's ID
+		String idStr = extractParameter(recordInfo, ID_LINE_KEY, ",");
+		try{ tempRecipe.id = Integer.parseInt(idStr);}
+		catch(Exception e){ return null; }
+		
+		// Extract the record's cuisine type
+		try{ tempRecipe.type = extractParameter(recordInfo, CUISINE_LINE_KEY, ",");}
+		catch(Exception e){ return null; }
+		if(tempRecipe.type == null) return null;
+		
+		// Get the list of ingredients
+		String[] splitIngredients;
+		try{
+			String allIngredients = extractParameter(recordInfo, INGREDIENTS_START_KEY, INGREDIENTS_END_KEY);
+			splitIngredients = allIngredients.split(",");
+			// All recipes have at least two ingredients
+			if(splitIngredients.length < 2) return null;
+		}
+		catch(Exception e){ return null; }
+		// Extract the ingredients and return them.
+		for( String rawIngredientString : splitIngredients ){
+			String ingredient = extractParameter(rawIngredientString, "\"", "\"");
+			if(ingredient == null) return null;
+			tempRecipe.ingredients.add(ingredient);
+		}
+		
+		// Everything parsed correctly so return the ingredient list
+		return tempRecipe;
 		
 	}
 	
+	
 	private static String extractParameter(String record, String keyStart, String keyEnd){
+		// Find start of the parameter
+		int startLoc = record.indexOf(keyStart) + keyStart.length();
+		if(startLoc == -1) return null;
+		// Find end of the parameter
+		int endLoc = record.indexOf(keyEnd, startLoc);
+		if(endLoc == -1) return null;
 		
+		return record.substring(startLoc, endLoc);
 	}
 	
 	
