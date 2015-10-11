@@ -17,8 +17,8 @@ import javax.swing.JOptionPane;
 public class RecipeCollection {
 
 	private Hashtable<Integer, Recipe> allRecipes = new Hashtable<Integer,Recipe>();
-	private Hashtable<String, Integer> cuisineTypes = new Hashtable<String,Integer>();
-	private Hashtable<String, Integer> allIngredients = new Hashtable<String,Integer>();
+	private Hashtable<String, CuisineType> cuisineTypes = new Hashtable<String,CuisineType>();
+	private Hashtable<String, Ingredient> allIngredients = new Hashtable<String,Ingredient>();
 	private int badRecordCount = 0;
 	
 	public static void main(String[] args){
@@ -48,9 +48,17 @@ public class RecipeCollection {
 			JOptionPane.showMessageDialog(null, "No file with the specified name exists.  Please specify a valid file and try again.");
 			return null;
 		}
-		
-		// Iterate through the file
+	
+		// Initialize the RecipeCollection to output
 		RecipeCollection tempRC = new RecipeCollection();
+
+		// Initialize the cuisine list.
+		CuisineType allTypes[] = CuisineType.values();
+		for(CuisineType type : allTypes){
+			tempRC.cuisineTypes.put(type.getName(), type);
+		}
+		
+		// Iterate through the recipe file and build the 
 		final String RECORD_START_CHAR = "{";
 		final String RECORD_END_CHAR = "}";
 		String line;
@@ -81,25 +89,25 @@ public class RecipeCollection {
 
 				// Add new recipe to the list
 				tempRC.allRecipes.put(newRecipe.getID(), newRecipe);
-				
-				// Update recipe frequency count
-				int cuisineTypeCount;
-				String tempType = newRecipe.getCuisineType();
-				if(tempRC.cuisineTypes.containsKey(tempType))
-					cuisineTypeCount = tempRC.cuisineTypes.get(tempType).intValue() + 1; 
-				else cuisineTypeCount = 1;
+					
 				// Update the cuisine type count in the hashtable
-				tempRC.cuisineTypes.put(tempType, cuisineTypeCount);
+				CuisineType type = tempRC.cuisineTypes.get(newRecipe.getCuisineType()); 
+				type.incrementRecipeCount();
+				tempRC.cuisineTypes.put(newRecipe.getCuisineType(), type);
 				
 				// Update recipe frequency count
-				String[] recipeIngredients = newRecipe.getIngredients();
-				for(String ingredient : recipeIngredients){
-					int ingredientCount;
-					if(tempRC.allIngredients.containsKey(ingredient))
-						ingredientCount = tempRC.allIngredients.get(ingredient).intValue() + 1; 
-					else ingredientCount = 1;
+				String[] recipeIngredientNames = newRecipe.getIngredients();
+				for(String ingredientName : recipeIngredientNames){
+					
+					// Extract the ingredient if it already exists.  
+					Ingredient ingredient = tempRC.allIngredients.get(ingredientName);
+					// Build a new ingredient if this ingredient does not already exist.
+					if(ingredient == null)	ingredient = new Ingredient(ingredientName);
+					
+					// Increment the usage of the ingredient for this recipe's cuisine type
+					ingredient.incrementCuisineUsage(type);
 					// Update the ingredients hash table
-					tempRC.allIngredients.put(ingredient, ingredientCount);
+					tempRC.allIngredients.put(ingredientName, ingredient);
 				}
 			} //if(line.indexOf(RECORD_END_CHAR) > 0 )
 		} //while(fileIn.hasNextLine())
@@ -133,12 +141,15 @@ public class RecipeCollection {
 			
 			for(int i = 0; i < cuisineTypeList.size(); i++){
 				// Separate each cuisine type by a new line
-				if(i != 0) fileOut.newLine();;
+				if(i != 0){
+					fileOut.write(",");
+					fileOut.newLine();
+				}
 				// Output the cuisine type and total number of recipes of that type
 				String cType = cuisineTypeList.get(i);
-				fileOut.write(cType + ", " + cuisineTypes.get(cType));
+				fileOut.write(cType + " (\"" + cType + "\", " + i + ")");
 			}
-			
+			fileOut.write(";");
 			fileOut.close(); //--- Close the file writing.
 
 		}

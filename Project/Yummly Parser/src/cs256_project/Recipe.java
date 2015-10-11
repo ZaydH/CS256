@@ -1,6 +1,7 @@
 package cs256_project;
 
 import java.util.ArrayList;
+import java.util.Collections;
 
 public class Recipe {
 
@@ -106,6 +107,14 @@ public class Recipe {
 		for(int i = 0; i < ingredients.size(); i++)
 			arrIngredients[i] = ingredients.get(i);
 		return arrIngredients;
+	}
+	
+	/**
+	 * For time saving purposes, it may be beneficial to have the ingredients sorted
+	 * in the Recipe object.  Adding this functionality just in case.
+	 */
+	public void sortIngredients(){
+		Collections.sort(ingredients);
 	}
 	
 }
