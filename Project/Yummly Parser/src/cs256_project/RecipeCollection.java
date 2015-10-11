@@ -19,6 +19,7 @@ public class RecipeCollection {
 	private Hashtable<Integer, Recipe> allRecipes = new Hashtable<Integer,Recipe>();
 	private Hashtable<String, CuisineType> cuisineTypes = new Hashtable<String,CuisineType>();
 	private Hashtable<String, Ingredient> allIngredients = new Hashtable<String,Ingredient>();
+	@SuppressWarnings("unused")
 	private int badRecordCount = 0;
 	
 	public static void main(String[] args){
@@ -31,6 +32,7 @@ public class RecipeCollection {
 		RecipeCollection col = RecipeCollection.getRecipeCollection(args[0]);
 		
 		col.outputCuisineTypes("Cuisines.txt");
+		col.outputIngredients("Ingredients.txt");
 
 		
 	}
@@ -55,7 +57,7 @@ public class RecipeCollection {
 		// Initialize the cuisine list.
 		CuisineType allTypes[] = CuisineType.values();
 		for(CuisineType type : allTypes){
-			tempRC.cuisineTypes.put(type.getName(), type);
+			tempRC.cuisineTypes.put(type.name(), type);
 		}
 		
 		// Iterate through the recipe file and build the 
@@ -105,7 +107,7 @@ public class RecipeCollection {
 					if(ingredient == null)	ingredient = new Ingredient(ingredientName);
 					
 					// Increment the usage of the ingredient for this recipe's cuisine type
-					ingredient.incrementCuisineUsage(type);
+					ingredient.incrementCuisineTypeCount(type);
 					// Update the ingredients hash table
 					tempRC.allIngredients.put(ingredientName, ingredient);
 				}
@@ -147,9 +149,45 @@ public class RecipeCollection {
 				}
 				// Output the cuisine type and total number of recipes of that type
 				String cType = cuisineTypeList.get(i);
-				fileOut.write(cType + " (\"" + cType + "\", " + i + ")");
+				fileOut.write(cType);
 			}
 			fileOut.write(";");
+			fileOut.close(); //--- Close the file writing.
+
+		}
+		catch(IOException e){
+			System.out.print("Error: Unable to write output file.");
+		}
+		
+	}
+	
+	
+	public void outputIngredients(String filePath){
+		
+
+		// Extract the list of ingredients
+		ArrayList<Ingredient> ingredientList = new ArrayList<Ingredient>(allIngredients.values());
+
+		// Sort the cuisine types
+	    Collections.sort(ingredientList, new Ingredient.RecipeCountCompareDescending() );
+	    
+	    // Print the Cuisine Information to a file
+        try{
+			BufferedWriter fileOut = new BufferedWriter(new FileWriter(filePath));
+			
+			for(int i = 0; i < ingredientList.size(); i++){
+				Ingredient ingredient = ingredientList.get(i);
+				// Separate each cuisine type by a new line
+				if(i != 0){
+					fileOut.newLine();
+				}
+				// Output the cuisine type and total number of recipes of that type
+				fileOut.write(ingredient.getName() + "," + ingredient.getTotalRecipeCount());
+				
+				int[] ingredientTypeCount = ingredient.getCuisineTypeCount();
+				for(int j = 0; j < ingredientTypeCount.length; j++)
+					fileOut.write("," + ingredientTypeCount[j]);
+			}
 			fileOut.close(); //--- Close the file writing.
 
 		}

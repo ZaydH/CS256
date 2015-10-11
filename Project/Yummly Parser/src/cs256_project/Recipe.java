@@ -69,6 +69,9 @@ public class Recipe {
 			tempRecipe.ingredients.add(ingredient);
 		}
 		
+		// Sort the recipe's ingredients before returning it.
+		tempRecipe.sortIngredientsAndRemoveDuplicates();
+		
 		// Everything parsed correctly so return the ingredient list
 		return tempRecipe;
 		
@@ -109,12 +112,26 @@ public class Recipe {
 		return arrIngredients;
 	}
 	
+//	/**
+//	 * For time saving purposes, it may be beneficial to have the ingredients sorted
+//	 * in the Recipe object.  Adding this functionality just in case.
+//	 */
+//	private void sortIngredients(){
+//		Collections.sort(ingredients);
+//	}
+	
+	
 	/**
-	 * For time saving purposes, it may be beneficial to have the ingredients sorted
-	 * in the Recipe object.  Adding this functionality just in case.
+	 * This methods sorts the list of ingredients for this recipe
+	 * and removes any duplicate ones.
 	 */
-	public void sortIngredients(){
+	private void sortIngredientsAndRemoveDuplicates(){
 		Collections.sort(ingredients);
+		
+		for(int i = 1; i < ingredients.size(); i++){
+			if( ingredients.get(i).equals(ingredients.get(i-1)) )
+				ingredients.remove(i);
+		}		
 	}
 	
 }
