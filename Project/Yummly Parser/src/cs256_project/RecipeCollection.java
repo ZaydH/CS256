@@ -1,11 +1,16 @@
 package cs256_project;
 
+import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Hashtable;
 import java.util.Scanner;
+import java.util.Set;
 
 import javax.swing.JOptionPane;
 
@@ -25,7 +30,8 @@ public class RecipeCollection {
 		
 		RecipeCollection col = RecipeCollection.getRecipeCollection(args[0]);
 		
-		int i = 1;
+		col.outputCuisineTypes("Cuisines.txt");
+
 		
 	}
 
@@ -100,6 +106,46 @@ public class RecipeCollection {
 		
 		fileIn.close(); // Close the scanner
 		return tempRC;	// Return the collection of recipe information.
+	}
+	
+	
+	/**
+	 * 
+	 * For a RecipeCollection, it prints to a file all of the cuisine types
+	 * and the number of recipes of that type.
+	 * 
+	 * @param filePath 	Path of the file to write containing cuisine information.
+	 */
+	public void outputCuisineTypes(String filePath){
+		
+
+		// Extract the list of 
+		ArrayList<String> cuisineTypeList = new ArrayList<String>();
+		Set<String> keys = cuisineTypes.keySet();
+		for(String key: keys)
+			cuisineTypeList.add(key);
+		// Sort the cuisine types
+	    Collections.sort(cuisineTypeList);
+	    
+	    // Print the Cuisine Information to a file
+        try{
+			BufferedWriter fileOut = new BufferedWriter(new FileWriter(filePath));
+			
+			for(int i = 0; i < cuisineTypeList.size(); i++){
+				// Separate each cuisine type by a new line
+				if(i != 0) fileOut.newLine();;
+				// Output the cuisine type and total number of recipes of that type
+				String cType = cuisineTypeList.get(i);
+				fileOut.write(cType + ", " + cuisineTypes.get(cType));
+			}
+			
+			fileOut.close(); //--- Close the file writing.
+
+		}
+		catch(IOException e){
+			System.out.print("Error: Unable to write output file.");
+		}
+		
 	}
 
 }
