@@ -53,18 +53,22 @@ public class RecipeCollection {
 			
 			line = fileIn.nextLine();
 			// Check if the StringBuffer needs to be cleared.
-			if(line.indexOf(RECORD_START_CHAR) > 0 ) recipeInfo.setLength(0);
+			if(line.indexOf(RECORD_START_CHAR) != -1 ) recipeInfo.setLength(0);
 			
 			// Append line to the String Buffer
 			recipeInfo.append(line);
+			recipeInfo.append("\n");
 			
 			// Find the end of the record
-			if(line.indexOf(RECORD_END_CHAR) > 0 ){
+			if(line.indexOf(RECORD_END_CHAR) != -1 ){
 				line = line.replace("},", "}");
 				recipeInfo.append(line);
 				Recipe newRecipe = Recipe.getRecipe(recipeInfo.toString());
 				// Check for bad records.
 				if(newRecipe == null){
+					String badRecipeInfo = recipeInfo.toString();
+					
+					System.out.print("Bad Record: " + badRecipeInfo + "\n\n");
 					tempRC.badRecordCount++; // Increment the bad record counter
 					continue; // Return to the next while loop.
 				}
@@ -85,7 +89,7 @@ public class RecipeCollection {
 				String[] recipeIngredients = newRecipe.getIngredients();
 				for(String ingredient : recipeIngredients){
 					int ingredientCount;
-					if(tempRC.cuisineTypes.containsKey(tempType))
+					if(tempRC.allIngredients.containsKey(ingredient))
 						ingredientCount = tempRC.allIngredients.get(ingredient).intValue() + 1; 
 					else ingredientCount = 1;
 					// Update the ingredients hash table

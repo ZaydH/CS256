@@ -9,9 +9,9 @@ public class Recipe {
 	private String type;
 	
 	private static final String ID_LINE_KEY = "\"id\":";
-	private static final String CUISINE_LINE_KEY = "\"CUISINE\":";
+	private static final String CUISINE_LINE_KEY = "\"cuisine\":";
 	private static final String INGREDIENTS_START_KEY = "[";
-	private static final String INGREDIENTS_END_KEY = "[";
+	private static final String INGREDIENTS_END_KEY = "]";
 	
 	
 	/**
@@ -37,11 +37,17 @@ public class Recipe {
 		
 		// Extract the record's ID
 		String idStr = extractParameter(recordInfo, ID_LINE_KEY, ",");
-		try{ tempRecipe.id = Integer.parseInt(idStr);}
+		try{
+			idStr = idStr.replace(" ", "");
+			tempRecipe.id = Integer.parseInt(idStr);
+		}
 		catch(Exception e){ return null; }
 		
 		// Extract the record's cuisine type
-		try{ tempRecipe.type = extractParameter(recordInfo, CUISINE_LINE_KEY, ",");}
+		try{ 
+			String typeInfo = extractParameter(recordInfo, CUISINE_LINE_KEY, ",");
+			tempRecipe.type = extractParameter(typeInfo, "\"", "\"");
+		}
 		catch(Exception e){ return null; }
 		if(tempRecipe.type == null) return null;
 		
@@ -49,14 +55,15 @@ public class Recipe {
 		String[] splitIngredients;
 		try{
 			String allIngredients = extractParameter(recordInfo, INGREDIENTS_START_KEY, INGREDIENTS_END_KEY);
-			splitIngredients = allIngredients.split(",");
+			splitIngredients = allIngredients.split("\n");
 			// All recipes have at least two ingredients
 			if(splitIngredients.length < 2) return null;
 		}
 		catch(Exception e){ return null; }
 		// Extract the ingredients and return them.
-		for( String rawIngredientString : splitIngredients ){
-			String ingredient = extractParameter(rawIngredientString, "\"", "\"");
+		for(int i = 1; i < splitIngredients.length -1; i++ ){ // Ignore the first and last record since a blank before the closing bracket
+			String ingredient = splitIngredients[i];
+			ingredient = extractParameter(ingredient, "\"", "\"");
 			if(ingredient == null) return null;
 			tempRecipe.ingredients.add(ingredient);
 		}
