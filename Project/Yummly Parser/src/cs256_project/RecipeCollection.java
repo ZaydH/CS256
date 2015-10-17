@@ -11,7 +11,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Hashtable;
 import java.util.List;
-import java.util.PriorityQueue;
 import java.util.Scanner;
 import java.util.Set;
 
@@ -21,10 +20,11 @@ import javax.swing.JOptionPane;
 public class RecipeCollection {
 
 	private Hashtable<Integer, Recipe> allRecipes = new Hashtable<Integer,Recipe>();
-	private Hashtable<String, CuisineType> cuisineTypes = new Hashtable<String,CuisineType>();
+	private Hashtable<CuisineType, Integer> cuisineTypeCount = new Hashtable<CuisineType,Integer>();
 	private Hashtable<String, Ingredient> allIngredients = new Hashtable<String,Ingredient>();
 	@SuppressWarnings("unused")
 	private int badRecordCount = 0;
+	ValueDistanceMetricCompare vdmCompare = new ValueDistanceMetricCompare(); 
 	
 	public static void main(String[] args){
 		
@@ -33,15 +33,30 @@ public class RecipeCollection {
 			return;
 		}
 		
-		RecipeCollection col = RecipeCollection.getRecipeCollection(args[0]);
+		RecipeCollection fullCollection = RecipeCollection.getRecipeCollection(args[0]);
 		
-		col.outputCuisineTypes("Cuisines.txt");
-		col.outputIngredients("Ingredients.txt");
-
-		col.print("Recipes.txt");
+		// Define the training and test sets
+		RecipeCollection[] cols = fullCollection.performRecipeHoldoutSplit(2.0/3);
+		RecipeCollection trainingSet = cols[0];
+		RecipeCollection testSet = cols[1];
 		
+		// Perform K-Nearest neighbor on the training sets.
+		RecipeCollection.RecipeDistance valueDist = trainingSet.getValueDistanceMetricCompare();
+		RecipeResult result = trainingSet.performKNearestNeighbor(testSet, 1, valueDist);
 	}
 
+	
+	private RecipeCollection(){
+		
+		// Initialize the cuisine list.
+		CuisineType allTypes[] = CuisineType.values();
+		for(CuisineType type : allTypes){
+			this.cuisineTypeCount.put(type, 0);
+		}
+		
+	}
+	
+	
 	/**
 	 * 
 	 * Factory method to build a recipe collection from a file.
@@ -66,12 +81,7 @@ public class RecipeCollection {
 		// Initialize the RecipeCollection to output
 		RecipeCollection tempRC = new RecipeCollection();
 
-		// Initialize the cuisine list.
-		CuisineType allTypes[] = CuisineType.values();
-		for(CuisineType type : allTypes){
-			tempRC.cuisineTypes.put(type.name(), type);
-		}
-		
+
 		// Iterate through the recipe file and build the 
 		final String RECORD_START_CHAR = "{";
 		final String RECORD_END_CHAR = "}";
@@ -102,32 +112,44 @@ public class RecipeCollection {
 				}
 
 				// Add new recipe to the list
-				tempRC.allRecipes.put(newRecipe.getID(), newRecipe);
+				tempRC.addRecipe(newRecipe);
 					
-				// Update the cuisine type count in the hashtable
-				CuisineType type = tempRC.cuisineTypes.get(newRecipe.getCuisineType()); 
-				type.incrementRecipeCount();
-				tempRC.cuisineTypes.put(newRecipe.getCuisineType(), type);
-				
-				// Update recipe frequency count
-				String[] recipeIngredientNames = newRecipe.getIngredients();
-				for(String ingredientName : recipeIngredientNames){
-					
-					// Extract the ingredient if it already exists.  
-					Ingredient ingredient = tempRC.allIngredients.get(ingredientName);
-					// Build a new ingredient if this ingredient does not already exist.
-					if(ingredient == null)	ingredient = new Ingredient(ingredientName);
-					
-					// Increment the usage of the ingredient for this recipe's cuisine type
-					ingredient.incrementCuisineTypeCount(type);
-					// Update the ingredients hash table
-					tempRC.allIngredients.put(ingredientName, ingredient);
-				}
+
 			} //if(line.indexOf(RECORD_END_CHAR) > 0 )
 		} //while(fileIn.hasNextLine())
 		
 		fileIn.close(); // Close the scanner
 		return tempRC;	// Return the collection of recipe information.
+	}
+	
+	/**
+	 * Adds a new recipe to this collection
+	 * 
+	 * @param newRecipe Recipe to add to the collection
+	 */
+	private void addRecipe(Recipe newRecipe){ 
+		allRecipes.put(newRecipe.getID(), newRecipe);
+		
+		// Update the cuisine type count in the hashtable
+		CuisineType type = CuisineType.valueOf(newRecipe.getCuisineType());
+		Integer cuisineCount = this.cuisineTypeCount.get(type);
+		this.cuisineTypeCount.put(type, cuisineCount.intValue() + 1);
+
+		// Update recipe frequency count
+		String[] recipeIngredientNames = newRecipe.getIngredients();
+		for(String ingredientName : recipeIngredientNames){
+			
+			// Extract the ingredient if it already exists.  
+			Ingredient ingredient = this.allIngredients.get(ingredientName);
+			// Build a new ingredient if this ingredient does not already exist.
+			if(ingredient == null)	ingredient = new Ingredient(ingredientName);
+			
+			// Increment the usage of the ingredient for this recipe's cuisine type
+			ingredient.incrementCuisineTypeCount(type);
+			// Update the ingredients hash table
+			this.allIngredients.put(ingredientName, ingredient);
+		}
+	
 	}
 	
 	
@@ -141,26 +163,22 @@ public class RecipeCollection {
 	public void outputCuisineTypes(String filePath){
 		
 
-		// Extract the list of 
-		ArrayList<String> cuisineTypeList = new ArrayList<String>();
-		Set<String> keys = cuisineTypes.keySet();
-		for(String key: keys)
-			cuisineTypeList.add(key);
-		// Sort the cuisine types
-	    Collections.sort(cuisineTypeList);
+		// Extract the list of cuisine types and sory them
+		CuisineType[] cuisineTypeList = CuisineType.values();
+	    Arrays.sort(cuisineTypeList);
 	    
 	    // Print the Cuisine Information to a file
         try{
 			BufferedWriter fileOut = new BufferedWriter(new FileWriter(filePath));
 			
-			for(int i = 0; i < cuisineTypeList.size(); i++){
+			for(int i = 0; i < cuisineTypeList.length; i++){
 				// Separate each cuisine type by a new line
 				if(i != 0){
 					fileOut.write(",");
 					fileOut.newLine();
 				}
 				// Output the cuisine type and total number of recipes of that type
-				String cType = cuisineTypeList.get(i);
+				String cType = cuisineTypeList[i].name();
 				fileOut.write(cType);
 			}
 			fileOut.write(";");
@@ -213,6 +231,36 @@ public class RecipeCollection {
 			System.out.print("Error: Unable to write output file.");
 		}
 	}
+	
+	
+	/**
+	 * Divides a RecipeCollection into a training and test set based off
+	 * a specified split percentage (e.g. 2/3).
+	 * 
+	 * @param splitRatio	Between 0 and 1. Ratio of elements to go in the training set.
+	 * @return				Array of RecipeCollection objects.  First element is the training set.  The second is the test set.
+	 */
+	public RecipeCollection[] performRecipeHoldoutSplit(double splitRatio){
+		
+		// Get all recipes in this collection
+		ArrayList<Recipe> shuffledRecipes = new ArrayList<Recipe>(Arrays.asList(this.getRecipes()));
+		Collections.shuffle(shuffledRecipes);
+
+		int i;
+		// Create the training and test sets
+		RecipeCollection trainingSet = new RecipeCollection();
+		RecipeCollection testSet = new RecipeCollection();
+		for(i = 0; i < shuffledRecipes.size(); i++){
+			if(i < splitRatio * shuffledRecipes.size())
+				trainingSet.addRecipe(shuffledRecipes.get(i));
+			else
+				testSet.addRecipe(shuffledRecipes.get(i));
+		}
+		
+		return new RecipeCollection[]{trainingSet, testSet};
+			
+	}
+
 	
 	
 	/**
@@ -279,14 +327,25 @@ public class RecipeCollection {
 	 */
 	private Recipe[] getRecipes(){
 		Recipe[] recipeArr = new Recipe[allRecipes.size()];
-		Integer[] keys = allRecipes.keySet().toArray();
+		Set<Integer> keySet = allRecipes.keySet();
+		Integer[] keys = keySet.toArray(new Integer[keySet.size()]);
 		for(int i = 0; i < keys.length; i++)
 			recipeArr[i] = allRecipes.get(keys[i]);
 		return recipeArr;
 	}
 	
 	
+	public ValueDistanceMetricCompare getValueDistanceMetricCompare(){return vdmCompare;}
 	
+	/**
+	 * 
+	 * 
+	 * 
+	 * @param testRecipeCollection	- Collection of Recipes whose class label will be determined.
+	 * @param k						- Value of "K" for K-Nearest Neighbors
+	 * @param dist					- Object that defines how the distance between two recipes is calculated.
+	 * @return
+	 */
 	public RecipeResult performKNearestNeighbor(RecipeCollection testRecipeCollection, int k, RecipeDistance dist){
 	
 		// Helper class for sorting on recipes.
@@ -338,8 +397,8 @@ public class RecipeCollection {
 				if(cuisineTypeCount[j] > cuisineTypeCount[maxId]) maxId = j;
 			}
 				
-			
-			String selectedCuisineType;
+			// Get the name of the cuisine type that corresponds with this ordinal number
+			String selectedCuisineType = CuisineType.fromInt(maxId).name();
 			// Check if the classification is correct
 			if(selectedCuisineType.equals(testRecipes[i].getCuisineType()))
 				correctClassifications++;	
@@ -393,6 +452,7 @@ public class RecipeCollection {
 	}
 	
 	
+	
 	/**
 	 * 
 	 * Used as a STRATEGY Method for determining the difference between
@@ -435,7 +495,7 @@ public class RecipeCollection {
 					i1 = allIngredients.get(i1Name);
 					i2 = allIngredients.get(i2Name);
 					calculatedDistance = 0;
-					for(int k = 0; k < cuisineTypes.size(); k++){
+					for(int k = 0; k < CuisineType.count(); k++){
 						calculatedDistance += Math.abs((double)(i1.getCuisineTypeCount(k))/i1.getTotalRecipeCount() 
 												       - (double)(i2.getCuisineTypeCount(k))/i2.getTotalRecipeCount());
 					}

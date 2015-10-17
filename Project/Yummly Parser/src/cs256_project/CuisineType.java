@@ -23,10 +23,10 @@ public enum CuisineType {
 	thai,
 	vietnamese;
 	
-	private int recipeCount;
+	private static int totalCuisineTypes;
 	
 	CuisineType(){
-		recipeCount = 0;
+//		recipeCount = 0;
 	}
 	
 //	/**
@@ -49,36 +49,53 @@ public enum CuisineType {
 //		return name;
 //	}
 	
-	/**
-	 * Each enumerated object contains a count for the number of recipes of that
-	 * cuisine type.  This tracks that counter.
-	 */
-	public void incrementRecipeCount(){
-		recipeCount++;
-	}
+//	/**
+//	 * Each enumerated object contains a count for the number of recipes of that
+//	 * cuisine type.  This tracks that counter.
+//	 */
+//	public void incrementRecipeCount(){
+//		recipeCount++;
+//	}
+//	
+//	/**
+//	 * Returns the number of recipes in the dataset for this cuisine type.
+//	 * 
+//	 * @return Integer - Number of recipes in the dataset of this cuisine type.
+//	 */
+//	public int getRecipeCount(){
+//		return recipeCount;
+//	}
 	
 	/**
-	 * Returns the number of recipes in the dataset for this cuisine type.
 	 * 
-	 * @return Integer - Number of recipes in the dataset of this cuisine type.
-	 */
-	public int getRecipeCount(){
-		return recipeCount;
-	}
-	
-	/**
+	 * Returns the Cuisine Type number corresponding to the 
 	 * 
 	 * @param ordinalNumb - CuisineType ordinal number.
-	 * @return CuisineType 
+	 * 
+	 * @return CuisineType that corresponds to the specified ordinal number.
 	 */
-	public CuisineType fromInt(int ordinalNumb){
-		return CuisineType.values()[int ordinalNumb];
+	public static CuisineType fromInt(int ordinalNumb){
+		return CuisineType.values()[ordinalNumb];
 	}
 	
 	
 	@Override
 	public String toString(){
 		return this.name();
+	}
+	
+	
+	/**
+	 * 
+	 * Extracts the number of different supported cuisine types.
+	 * 
+	 * @return Number of different cuisine types
+	 */
+	public static int count(){
+		// Determine the number of cuisine types if it is not already stored.
+		if(totalCuisineTypes == 0 ) 
+			totalCuisineTypes = CuisineType.values().length;
+		return totalCuisineTypes;
 	}
 	
 }
