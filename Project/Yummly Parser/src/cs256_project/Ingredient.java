@@ -51,13 +51,13 @@ public class Ingredient {
 	
 	
 	/**
-	 * Extracts the number of times this ingredient is used for a particular
+	 * Extracts the number of times this ingredient is used for each
 	 * cuisine type.
 	 * 
 	 * @return  int[] - For each of the CuisineType, this function returns the 
 	 * number of recipes of that type containing this ingredient.
 	 */
-	public int[] getCuisineTypeCount(){
+	public int[] getAllCuisineTypesCount(){
 		int[] typeUsage = new int[cuisineUsage.length];
 		
 		for(int i = 0; i < typeUsage.length; i++)
@@ -67,6 +67,21 @@ public class Ingredient {
 	}
 	
 	
+	/**
+	 * Extracts the number of types this ingredient is used
+	 * in the specified cuisine type.
+	 * 
+	 * @param id - CuisineType ID
+	 * @return Number of recipes of the specified cuisine type ID this recipe appears	
+	 */
+	public int getCuisineTypeCount(int id){ return cuisineUsage[id];}
+	
+	
+	/**
+	 * Gets the recipe count for this ingredient.
+	 * 
+	 * @return Total number of recipes containing this ingredient.
+	 */
 	public int getTotalRecipeCount(){ return totalRecipeCount;	}
 	
 	/**

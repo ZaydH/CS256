@@ -66,6 +66,15 @@ public enum CuisineType {
 		return recipeCount;
 	}
 	
+	/**
+	 * 
+	 * @param ordinalNumb - CuisineType ordinal number.
+	 * @return CuisineType 
+	 */
+	public CuisineType fromInt(int ordinalNumb){
+		return CuisineType.values()[int ordinalNumb];
+	}
+	
 	
 	@Override
 	public String toString(){

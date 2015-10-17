@@ -2,6 +2,8 @@ package cs256_project;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
+import java.util.Hashtable;
 
 public class Recipe {
 
@@ -11,7 +13,7 @@ public class Recipe {
 	
 	private static final String ID_LINE_KEY = "\"id\":";
 	private static final String CUISINE_LINE_KEY = "\"cuisine\":";
-	private static final String INGREDIENTS_START_KEY = "[";
+	private static final String INGREDIENTS_START_KEY = "\"ingredients\": [";
 	private static final String INGREDIENTS_END_KEY = "]";
 	
 	
@@ -133,5 +135,39 @@ public class Recipe {
 				ingredients.remove(i);
 		}		
 	}
+	
+	/**
+	 * Prints the Recipe in JSON format.
+	 */
+	@Override
+	public String toString(){
+	
+		String spacer = "  ";
+		StringBuffer outputBuffer = new StringBuffer();
+		
+		outputBuffer.append(spacer + "{\n");
+		outputBuffer.append(spacer + spacer + ID_LINE_KEY + " " + this.getID() +",\n" );
+		outputBuffer.append(spacer + spacer + CUISINE_LINE_KEY + " \"" + this.getCuisineType() +"\",\n" );
+		outputBuffer.append(spacer + spacer + INGREDIENTS_START_KEY + "\n" );
+		
+		// 
+		String ingredientStartString = spacer + spacer + spacer;
+		for(int i = 0; i < this.ingredients.size(); i++){
+			// Add after all ingredients except the last one.
+			if(i != 0 ) outputBuffer.append(",\n");
+			// Add the ingredient information.
+			outputBuffer.append(ingredientStartString);
+			outputBuffer.append("\"" + this.ingredients.get(i) +  "\"");
+		}
+		outputBuffer.append("\n"); // Need a new line after the last ingredient
+		outputBuffer.append(spacer + spacer + INGREDIENTS_END_KEY + "\n" );
+		// Close the JSON record
+		outputBuffer.append(spacer + "}");
+		
+		return outputBuffer.toString();
+	
+	}
+	
+
 	
 }
