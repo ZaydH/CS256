@@ -26,6 +26,9 @@ public class RecipeCollection {
 	private int badRecordCount = 0;
 	ValueDistanceMetricCompare vdmCompare = new ValueDistanceMetricCompare(); 
 	
+	
+	private static final int MINIMUM_RECIPE_SIZE = 4;
+	
 	public static void main(String[] args){
 		
 		if(args.length != 1){
@@ -42,7 +45,7 @@ public class RecipeCollection {
 		
 		// Perform K-Nearest neighbor on the training sets.
 		RecipeCollection.RecipeDistance valueDist = trainingSet.getValueDistanceMetricCompare();
-		RecipeResult result = trainingSet.performKNearestNeighbor(testSet, 1, valueDist);
+		RecipeResult result = trainingSet.performKNearestNeighbor(testSet, 5, valueDist);
 		
 		System.out.println("Accuracy is: " + String.format("%9.2f", result.getAccuracy() * 100) + "%.");
 	}
@@ -112,10 +115,16 @@ public class RecipeCollection {
 					tempRC.badRecordCount++; // Increment the bad record counter
 					continue; // Return to the next while loop.
 				}
-
-				// Add new recipe to the list
-				tempRC.addRecipe(newRecipe);
-					
+				
+				if(newRecipe.getIngredientCount() >= MINIMUM_RECIPE_SIZE)
+					// Add new recipe to the list
+					tempRC.addRecipe(newRecipe);
+				else{
+					if(tempRC.badRecordCount == 0) 
+						System.out.println("Invalid recipes: (RecipeID,NumberOfIngredients)");
+					System.out.println(newRecipe.getID() + "," + newRecipe.getIngredientCount());
+					tempRC.badRecordCount++;
+				}
 
 			} //if(line.indexOf(RECORD_END_CHAR) > 0 )
 		} //while(fileIn.hasNextLine())
@@ -395,7 +404,7 @@ public class RecipeCollection {
 			}
 			// Find the id of the cuisine type with the most matches
 			int maxId = 0;
-			for(int j = 1; j < k; j++){
+			for(int j = 1; j < CuisineType.count(); j++){
 				if(cuisineTypeCount[j] > cuisineTypeCount[maxId]) maxId = j;
 			}
 				
@@ -403,7 +412,12 @@ public class RecipeCollection {
 			String selectedCuisineType = CuisineType.fromInt(maxId).name();
 			// Check if the classification is correct
 			if(selectedCuisineType.equals(testRecipes[i].getCuisineType()))
-				correctClassifications++;	
+				correctClassifications++;
+			
+			if(i > 0 && i % 25 == 0){
+				System.out.println(i + " out of " + testRecipes.length + " have been completed.");
+				System.out.println("Accuracy so far: " + String.format("%9.2f", 100.0 * correctClassifications/(i+1)) + "%.\n\n");
+			}
 		}
 		
 		// Calculate the overall accuracy

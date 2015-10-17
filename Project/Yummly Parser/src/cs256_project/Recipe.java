@@ -107,6 +107,14 @@ public class Recipe {
 	}
 	
 	
+	/**
+	 * Extracts the number of ingredients in a given recipe.
+	 * 
+	 * @return Number of ingredients in this recipe.
+	 */
+	public int getIngredientCount(){ return ingredients.size(); }
+	
+	
 	public String[] getIngredients(){
 		String[] arrIngredients = new String[ingredients.size()];
 		for(int i = 0; i < ingredients.size(); i++)
