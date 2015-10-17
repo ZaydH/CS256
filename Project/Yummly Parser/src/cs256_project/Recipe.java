@@ -1,9 +1,11 @@
 package cs256_project;
 
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
-import java.util.Hashtable;
+import java.util.Scanner;
 
 public class Recipe {
 
@@ -17,12 +19,40 @@ public class Recipe {
 	private static final String INGREDIENTS_END_KEY = "]";
 	
 	
+	private static ArrayList<String> ingredientWordFilterList = new ArrayList<String>();
+	private static final String INGREDIENT_WORD_FILTER_LIST_FILENAME = "ingredient_filtered_words.txt";
+	
 	/**
 	 * Hidden constructor.  Must use the FactoryMethod to get ingredients.
 	 */
 	private Recipe(){
 		id = -1;
 		type = "UNINITIALIZED";
+		
+		// Build a list of words to remove from the ingredients
+		if(ingredientWordFilterList.size() == 0){
+			File file = new File(INGREDIENT_WORD_FILTER_LIST_FILENAME);
+			
+			//----- Once the file extension has been verified, try opening the file.
+			Scanner fileIn;
+			try{
+				fileIn = new Scanner(new FileReader(file));
+
+				// Iterate through the recipe file and build the 
+				String line;
+				while(fileIn.hasNextLine()){				
+					line = fileIn.nextLine().replace(" ", "");
+					if(line.length() == 0) continue;
+					ingredientWordFilterList.add(line);
+				} //while(fileIn.hasNextLine())
+				
+				fileIn.close(); // Close the scanner
+			}
+			catch(FileNotFoundException e){
+				System.out.println("No file with the specified name exists.  Please specify a valid file and try again.");
+				System.exit(0);
+			}
+		}
 	}
 	
 	/**
@@ -68,6 +98,39 @@ public class Recipe {
 			String ingredient = splitIngredients[i];
 			ingredient = extractParameter(ingredient, "\"", "\"");
 			if(ingredient == null) return null;
+			
+			// For normalization purposes, make the name lowercase
+			ingredient = ingredient.toLowerCase();
+			
+			// Remove the any words to be filters
+			// Split into words when doing this to prevent finding substrings
+			String[] ingredientSplit = ingredient.split(" ");
+			boolean[] filterWord = new boolean[ingredientSplit.length];
+			for(int wordCnt = 0; wordCnt < ingredientSplit.length ; wordCnt++){
+				filterWord[wordCnt] = false; // Default is not to filter
+				
+				// Check if the word matches any word to filter
+				for(String filter : ingredientWordFilterList){
+					if(ingredientSplit[wordCnt].equals(filter)){
+						filterWord[wordCnt] = true; // Mark the word for filtering
+						break;
+					}
+				}
+			}
+			// Rebuild Ingredient String
+			StringBuffer sb = new StringBuffer();
+			for(int wordCnt = 0; wordCnt < ingredientSplit.length ; wordCnt++){
+				if(!filterWord[wordCnt]){
+					if(sb.length() > 0) sb.append(" ");// Add a space when not the first word in the string
+					sb.append(ingredientSplit[wordCnt]);
+				}
+			}
+			ingredient = sb.toString();
+			
+			// Skip any words totally filtered
+			if(ingredient.length() == 0) continue;
+			
+
 			tempRecipe.ingredients.add(ingredient);
 		}
 		

@@ -37,6 +37,7 @@ public class RecipeCollection {
 		}
 		
 		RecipeCollection fullCollection = RecipeCollection.getRecipeCollection(args[0]);
+		fullCollection.print("filtered_train.json.txt");
 		
 		// Define the training and test sets
 		RecipeCollection[] cols = fullCollection.performRecipeHoldoutSplit(2.0/3);
@@ -45,7 +46,8 @@ public class RecipeCollection {
 		
 		// Perform K-Nearest neighbor on the training sets.
 		RecipeCollection.RecipeDistance valueDist = trainingSet.getValueDistanceMetricCompare();
-		RecipeResult result = trainingSet.performKNearestNeighbor(testSet, 5, valueDist);
+		RecipeResult result = trainingSet.performKNearestNeighbor(testSet,10, valueDist);
+		//RecipeResult result = trainingSet.performKNearestNeighbor(testSet,10, new RecipeCollection.OverlapCoefficient());
 		
 		System.out.println("Accuracy is: " + String.format("%9.2f", result.getAccuracy() * 100) + "%.");
 	}
@@ -285,7 +287,7 @@ public class RecipeCollection {
 	public void print(String filePath){
 		// 
 		ArrayList<Recipe> recipeList = new ArrayList<Recipe>(allRecipes.values());
-		RecipeCollection.printRecipesFile("Recipes.txt", recipeList);
+		RecipeCollection.printRecipesFile(filePath, recipeList);
 	}
 	
 	
@@ -371,6 +373,8 @@ public class RecipeCollection {
 			
 			public Recipe getRecipe(){ return recipe; }
 			
+			public double getDistance(){ return distance; };
+			
 			@Override
 			public int compareTo(RecipeWrapper other){
 				if(this.distance < other.distance) return -1;
@@ -396,10 +400,11 @@ public class RecipeCollection {
 			Arrays.sort(sortedRecipes);
 			
 			// Iterate through the sorted recipes and find the most common cuisine types
-			int[] cuisineTypeCount = new int[CuisineType.values().length];
+			double[] cuisineTypeCount = new double[CuisineType.values().length];
 			for(int j = 0; j < k; j++){
 				// Get the cuisine type for this recipe
-				CuisineType type = CuisineType.valueOf(sortedRecipes[k].getRecipe().getCuisineType());
+				CuisineType type = CuisineType.valueOf(sortedRecipes[j].getRecipe().getCuisineType());
+				//cuisineTypeCount[type.ordinal()] += 1.0 / Math.pow(sortedRecipes[j].getDistance(),2);
 				cuisineTypeCount[type.ordinal()]++;
 			}
 			// Find the id of the cuisine type with the most matches
@@ -467,6 +472,43 @@ public class RecipeCollection {
 		double compare(Recipe r1, Recipe r2);
 	}
 	
+	
+	
+	
+	/**
+	 * 
+	 * Used as a STRATEGY Method for determining the difference between
+	 * two recipes in the collection.
+	 *
+	 */
+	public static class OverlapCoefficient implements RecipeDistance{
+		
+		@Override
+		public double compare(Recipe r1, Recipe r2){
+			
+			
+			
+			
+			String[] r1Ingredients = r1.getIngredients();
+			String[] r2Ingredients = r2.getIngredients();
+			int totalMismatches = Math.min(r1Ingredients.length, r2Ingredients.length);
+			
+			// Iterate through each ingredient list
+			for(int i = 0; i < r1Ingredients.length; i++){
+				for(int j = 0; j < r2Ingredients.length; j++){
+					if(r1Ingredients[i].equals(r2Ingredients[j])){
+						totalMismatches--; // Remove one mismatch
+						break;
+					}
+				}
+			}
+			
+			// Normalize the distance to recipe length.
+			return 1.0* totalMismatches/Math.min(r1Ingredients.length, r2Ingredients.length);
+			
+		}
+		
+	}
 	
 	
 	/**
@@ -543,7 +585,9 @@ public class RecipeCollection {
 				totalDistance /= (r1Ingredients.length * r2Ingredients.length - illegalIngredientPairs);
 			else
 				totalDistance = Double.MAX_VALUE;
-			return totalDistance;
+			
+			RecipeDistance oc = new OverlapCoefficient();
+			return totalDistance * oc.compare(r1, r2);
 			
 		}
 		
