@@ -43,6 +43,8 @@ public class RecipeCollection {
 		// Perform K-Nearest neighbor on the training sets.
 		RecipeCollection.RecipeDistance valueDist = trainingSet.getValueDistanceMetricCompare();
 		RecipeResult result = trainingSet.performKNearestNeighbor(testSet, 1, valueDist);
+		
+		System.out.println("Accuracy is: " + String.format("%9.2f", result.getAccuracy() * 100) + "%.");
 	}
 
 	
@@ -463,8 +465,12 @@ public class RecipeCollection {
 		
 		Hashtable<String, Double> ingredientDistance = new Hashtable<String, Double>();
 		
+		private final static int  MIN_INGREDIENT_PAIRS = 5;
+		
 		@Override
 		public double compare(Recipe r1, Recipe r2){
+			
+			
 			
 			double totalDistance = 0;
 			double calculatedDistance;
@@ -473,16 +479,28 @@ public class RecipeCollection {
 			Ingredient i1, i2;
 			String[] r1Ingredients = r1.getIngredients();
 			String[] r2Ingredients = r2.getIngredients();
+			int illegalIngredientPairs = 0; // This is caused by an ingredient from either recipe not being in the known set
 			
 			// Iterate through each ingredient list
 			for(int i = 0; i < r1Ingredients.length; i++){
+				
+				i1Name = r1Ingredients[i];
+				// Check if i1 is a known ingredient name
+				if(allIngredients.get(i1Name) == null){
+					illegalIngredientPairs += r2Ingredients.length;
+					continue;
+				}
+				
 				for(int j = 0; j < r2Ingredients.length; j++){
-					
-					i1Name = r1Ingredients[i];
 					i2Name = r2Ingredients[j];
 					
 					// If the ingredients are identical, go to the next ingredient.
 					if(i1Name.equals(i2Name)) continue;
+					// Check if i2 is a known ingredient name
+					if(allIngredients.get(i2Name) == null){
+						illegalIngredientPairs++;
+						continue;
+					}
 					
 					// See if the ingredient distance is store
 					storedDistance = ingredientDistance.get(getKeyName(i1Name, i2Name));
@@ -502,12 +520,15 @@ public class RecipeCollection {
 					// Store the inter-ingredient distance in the collection.
 					storedDistance = calculatedDistance;
 					ingredientDistance.put(getKeyName(i1Name, i2Name), storedDistance);
-		
+					totalDistance += calculatedDistance;
 				}
 			}
 			
 			// Normalize the distance to recipe length.
-			totalDistance /= (r1Ingredients.length + r2Ingredients.length);
+			if(r1Ingredients.length * r2Ingredients.length - illegalIngredientPairs > MIN_INGREDIENT_PAIRS)
+				totalDistance /= (r1Ingredients.length * r2Ingredients.length - illegalIngredientPairs);
+			else
+				totalDistance = Double.MAX_VALUE;
 			return totalDistance;
 			
 		}
