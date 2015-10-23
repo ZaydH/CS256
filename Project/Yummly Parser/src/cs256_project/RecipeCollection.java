@@ -36,23 +36,84 @@ public class RecipeCollection {
 			return;
 		}
 		
-		RecipeCollection fullCollection = RecipeCollection.getRecipeCollection(args[0]);
+		RecipeCollection fullCollection = RecipeCollection.getRecipeCollection("filtered_train.json.txt");
+		//RecipeCollection fullCollection = RecipeCollection.getRecipeCollection(args[0]);
 		fullCollection.print("filtered_train.json.txt");
 		
 		// Define the training and test sets
-		RecipeCollection[] cols = fullCollection.performRecipeHoldoutSplit(2.0/3);
+		RecipeCollection[] cols = fullCollection.performRecipeHoldoutSplit((float)6/7);
 		RecipeCollection trainingSet = cols[0];
 		RecipeCollection testSet = cols[1];
 		
 		// Perform K-Nearest neighbor on the training sets.
 		RecipeCollection.RecipeDistance valueDist = trainingSet.getValueDistanceMetricCompare();
-		RecipeResult result = trainingSet.performKNearestNeighbor(testSet,10, valueDist);
-		//RecipeResult result = trainingSet.performKNearestNeighbor(testSet,10, new RecipeCollection.OverlapCoefficient());
+		trainingSet.performKNearestNeighbor(testSet, 10, valueDist, true, false, true);
 		
-		System.out.println("Accuracy is: " + String.format("%9.2f", result.getAccuracy() * 100) + "%.");
+		//trainingSet.performKNearestNeighbor(testSet, 50, new RecipeCollection.OverlapCoefficient(), false, false, true);
+		
+		//RecipeCollection.WeightedOverlapCoefficient weightedOverlap = trainingSet.getWeightedOverlapCoefficient();
+		//RecipeResult result = trainingSet.performKNearestNeighbor(testSet, 5, weightedOverlap);
+		
+	    // Collect Data on different Settings
+        try{
+        	String filePath = "algorithm_comparison.csv";
+			BufferedWriter fileOut = new BufferedWriter(new FileWriter(filePath));
+			RecipeResult result;
+			// Put the beginning of the JSON file.
+			fileOut.write("[");
+			fileOut.newLine();
+			
+			// Create a weighted overlap coefficient object
+			RecipeCollection.WeightedOverlapCoefficient weightedOverlap = trainingSet.getWeightedOverlapCoefficient();
+			
+			fileOut.write("Algorithm_Name,K,Use_Weighted_KNN,FirstChoiceAccuracy,TopTwoAccuracy");
+			fileOut.newLine();
+			
+			for(int k =1; k <= 65; k*=2){
+				boolean useWeightedKNN;
+				for(int i = 0; i < 2; i++){
+					
+					// Select whether or not to use weighted KNN
+					if(i == 0) useWeightedKNN = false;
+					else 	   useWeightedKNN = true;
+					boolean useClassProbabilityWeighting;
+					for(int j =0; j < 2; j++){
+						
+						if(j == 0) useClassProbabilityWeighting = false;
+						else 	   useClassProbabilityWeighting = true;
+						
+						result = trainingSet.performKNearestNeighbor(testSet, k, weightedOverlap, useWeightedKNN, useClassProbabilityWeighting , false);
+						fileOut.write("weighted_overlap," + k + "," + useWeightedKNN + "," + useClassProbabilityWeighting + "," + result.accuracy + "," + result.topTwoAccuracy);
+						fileOut.newLine();
+					
+						result = trainingSet.performKNearestNeighbor(testSet, k, new RecipeCollection.OverlapCoefficient(), useWeightedKNN,useClassProbabilityWeighting, false);
+						fileOut.write("standard_overlap," + k + "," + useWeightedKNN + "," + useClassProbabilityWeighting + "," + result.accuracy + "," + result.topTwoAccuracy);
+						fileOut.newLine();
+					}
+				
+				}
+				
+			}
+			
+			// Put the end of the JSON file then close it.
+			fileOut.close();
+
+		}
+		catch(IOException e){
+			System.out.print("Error: Unable to write output file for the recipes.");
+		}
+		
+		
+		//System.out.println("Accuracy is: " + String.format("%9.2f", result.getAccuracy() * 100) + "%.");
 	}
 
 	
+	/**
+	 * Private Constructor for a Recipe Collection.
+	 * 
+	 * I do not want users creating Recipe Collections directly.  Instead,
+	 * I will use a factory method object to create the recipe for them.
+	 */
 	private RecipeCollection(){
 		
 		// Initialize the cuisine list.
@@ -349,6 +410,7 @@ public class RecipeCollection {
 	
 	
 	public ValueDistanceMetricCompare getValueDistanceMetricCompare(){return vdmCompare;}
+	public WeightedOverlapCoefficient getWeightedOverlapCoefficient(){ return new WeightedOverlapCoefficient(); }
 	
 	/**
 	 * 
@@ -359,7 +421,9 @@ public class RecipeCollection {
 	 * @param dist					- Object that defines how the distance between two recipes is calculated.
 	 * @return
 	 */
-	public RecipeResult performKNearestNeighbor(RecipeCollection testRecipeCollection, int k, RecipeDistance dist){
+	public RecipeResult performKNearestNeighbor(RecipeCollection testRecipeCollection, int k, RecipeDistance dist, 
+												boolean useWeightedDistance, boolean useClassProbabilityWeighting, 
+												boolean printIncrementalResults){
 	
 		// Helper class for sorting on recipes.
 		class RecipeWrapper implements Comparable<RecipeWrapper>{
@@ -388,6 +452,7 @@ public class RecipeCollection {
 		Recipe[] testRecipes = testRecipeCollection.getRecipes();
 		Recipe[] trainingRecipes = this.getRecipes();
 		int correctClassifications = 0;
+		int correctFirstOrSecondClassifications = 0;
 		for(int i = 0; i < testRecipes.length; i++){
 			
 			RecipeWrapper[] sortedRecipes = new RecipeWrapper[trainingRecipes.length];
@@ -400,33 +465,63 @@ public class RecipeCollection {
 			Arrays.sort(sortedRecipes);
 			
 			// Iterate through the sorted recipes and find the most common cuisine types
-			double[] cuisineTypeCount = new double[CuisineType.values().length];
+			double[] recipeCuisineScore = new double[CuisineType.values().length];
 			for(int j = 0; j < k; j++){
 				// Get the cuisine type for this recipe
 				CuisineType type = CuisineType.valueOf(sortedRecipes[j].getRecipe().getCuisineType());
-				//cuisineTypeCount[type.ordinal()] += 1.0 / Math.pow(sortedRecipes[j].getDistance(),2);
-				cuisineTypeCount[type.ordinal()]++;
+				if(useWeightedDistance){
+					recipeCuisineScore[type.ordinal()] += 1.0 / Math.pow(sortedRecipes[j].getDistance(),2);
+				}
+				else{
+					recipeCuisineScore[type.ordinal()]++;
+				}
 			}
-			// Find the id of the cuisine type with the most matches
+			
+			// If this feature is enabled, normalize the probabilities based off class score likelihood.
+			if(useClassProbabilityWeighting){
+				for(int j = 0; j < CuisineType.count(); j++){
+					//if(cuisineTypeCount[j] > cuisineTypeCount[maxId]) maxId = j;
+					CuisineType cuisine = CuisineType.fromInt(j);
+					recipeCuisineScore[j] /= cuisineTypeCount.get(cuisine);
+				}
+			}
+			
+			// Find the name of the cuisine types with the highest two scores.
 			int maxId = 0;
 			for(int j = 1; j < CuisineType.count(); j++){
-				if(cuisineTypeCount[j] > cuisineTypeCount[maxId]) maxId = j;
+				if(recipeCuisineScore[j] > recipeCuisineScore[maxId]) maxId = j;
+			}
+			int secondMaxId = (maxId!=0)?0:1;
+			for(int j = secondMaxId + 1; j < CuisineType.count(); j++){
+				if(recipeCuisineScore[j] > recipeCuisineScore[secondMaxId] && j!=maxId) secondMaxId = j;
 			}
 				
 			// Get the name of the cuisine type that corresponds with this ordinal number
-			String selectedCuisineType = CuisineType.fromInt(maxId).name();
-			// Check if the classification is correct
-			if(selectedCuisineType.equals(testRecipes[i].getCuisineType()))
-				correctClassifications++;
+			String firstCuisineType = CuisineType.fromInt(maxId).name();
+			String secondCuisineType = CuisineType.fromInt(secondMaxId).name();
 			
-			if(i > 0 && i % 25 == 0){
-				System.out.println(i + " out of " + testRecipes.length + " have been completed.");
-				System.out.println("Accuracy so far: " + String.format("%9.2f", 100.0 * correctClassifications/(i+1)) + "%.\n\n");
+			// Check if the classification is correct
+			if(firstCuisineType.equals(testRecipes[i].getCuisineType())){
+				correctClassifications++;
+				correctFirstOrSecondClassifications++;
+			}
+			// Check if the second best selection is correct.
+			else if(secondCuisineType.equals(testRecipes[i].getCuisineType())){
+				correctFirstOrSecondClassifications++;
+			}
+			
+			if(printIncrementalResults){
+				if(i > 0 && i % 25 == 0){
+					System.out.println(i + " out of " + testRecipes.length + " have been completed.");
+					System.out.println("First place accuracy so far: " + String.format("%9.2f", 100.0 * correctClassifications/(i+1)) + "%.");
+					System.out.println("Two two accuracy so far: " + String.format("%9.2f", 100.0 * correctFirstOrSecondClassifications/(i+1)) + "%.\n\n");
+				}
 			}
 		}
 		
 		// Calculate the overall accuracy
 		results.setAccuracy((double)correctClassifications/testRecipes.length);
+		results.setTopTwoAccuracy((double)correctFirstOrSecondClassifications/testRecipes.length);
 
 		return results;
 		
@@ -436,10 +531,14 @@ public class RecipeCollection {
 	public class RecipeResult {
 	
 		double accuracy;
+		double topTwoAccuracy;// This is the combined accuracy of the first and second choice.
 		
 		
 		public double getAccuracy(){ return accuracy; }
 		public void setAccuracy(double accuracy){ this.accuracy = accuracy; }
+		
+		public double getTopTwoAccuracy(){ return topTwoAccuracy; }
+		public void setTopTwoAccuracy(double topTwoAccuracy){ this.topTwoAccuracy = topTwoAccuracy; }
 		
 	}
 
@@ -486,9 +585,6 @@ public class RecipeCollection {
 		@Override
 		public double compare(Recipe r1, Recipe r2){
 			
-			
-			
-			
 			String[] r1Ingredients = r1.getIngredients();
 			String[] r2Ingredients = r2.getIngredients();
 			int totalMismatches = Math.min(r1Ingredients.length, r2Ingredients.length);
@@ -509,6 +605,49 @@ public class RecipeCollection {
 		}
 		
 	}
+	
+	
+	/**
+	 * 
+	 * Used as a STRATEGY Method for determining the difference between
+	 * two recipes in the collection.
+	 * 
+	 * This is a modified version of the standard OverlapCoefficient above. 
+	 * This gives a weighted overlap bonus based off 1 / (1 + IngredientEntropy).
+	 * 
+	 * Hence an ingredient that appears in only one cuisine type that is matched will
+	 * have its mismatch score reduced by one.  In contrast, an ingredient that is 
+	 * in a lot of different recipe types will have the a lower mismatch reduction.
+	 *
+	 */
+	public class WeightedOverlapCoefficient implements RecipeDistance{
+		
+		@Override
+		public double compare(Recipe r1, Recipe r2){
+			
+			String[] r1Ingredients = r1.getIngredients();
+			String[] r2Ingredients = r2.getIngredients();
+			int totalMismatches = Math.min(r1Ingredients.length, r2Ingredients.length);
+			
+			// Iterate through each ingredient list
+			for(int i = 0; i < r1Ingredients.length; i++){
+				for(int j = 0; j < r2Ingredients.length; j++){
+					if(r1Ingredients[i].equals(r2Ingredients[j])){
+						Ingredient ingredient = allIngredients.get(r1Ingredients[i]);
+						
+						totalMismatches -= 1.0 / (1.0 + ingredient.getEntropy()); // Remove one mismatch
+						break;
+					}
+				}
+			}
+			
+			// Normalize the distance to recipe length.
+			return 1.0* totalMismatches/Math.min(r1Ingredients.length, r2Ingredients.length);
+			
+		}
+		
+	}
+	
 	
 	
 	/**
@@ -542,7 +681,8 @@ public class RecipeCollection {
 				
 				i1Name = r1Ingredients[i];
 				// Check if i1 is a known ingredient name
-				if(allIngredients.get(i1Name) == null){
+				i1 = allIngredients.get(i1Name);
+				if(i1 == null){
 					illegalIngredientPairs += r2Ingredients.length;
 					continue;
 				}
@@ -552,8 +692,10 @@ public class RecipeCollection {
 					
 					// If the ingredients are identical, go to the next ingredient.
 					if(i1Name.equals(i2Name)) continue;
+					
 					// Check if i2 is a known ingredient name
-					if(allIngredients.get(i2Name) == null){
+					i2 = allIngredients.get(i2Name);
+					if(i2 == null){
 						illegalIngredientPairs++;
 						continue;
 					}
@@ -566,15 +708,13 @@ public class RecipeCollection {
 					}
 					
 					// Ingredient distance is not stored so calculate it.
-					i1 = allIngredients.get(i1Name);
-					i2 = allIngredients.get(i2Name);
 					calculatedDistance = 0;
 					for(int k = 0; k < CuisineType.count(); k++){
 						calculatedDistance += Math.abs((double)(i1.getCuisineTypeCount(k))/i1.getTotalRecipeCount() 
 												       - (double)(i2.getCuisineTypeCount(k))/i2.getTotalRecipeCount());
 					}
 					// Store the inter-ingredient distance in the collection.
-					storedDistance = calculatedDistance;
+					storedDistance = calculatedDistance; // Convert to a Wrapper Double object (i.e. non-double primitive)
 					ingredientDistance.put(getKeyName(i1Name, i2Name), storedDistance);
 					totalDistance += calculatedDistance;
 				}
@@ -586,8 +726,8 @@ public class RecipeCollection {
 			else
 				totalDistance = Double.MAX_VALUE;
 			
-			RecipeDistance oc = new OverlapCoefficient();
-			return totalDistance * oc.compare(r1, r2);
+			//RecipeDistance oc = new OverlapCoefficient();
+			return totalDistance;// * oc.compare(r1, r2);
 			
 		}
 		

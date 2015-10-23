@@ -16,7 +16,6 @@ finely
 large
 medium
 small
-extra small
 
 warm
 plain
