@@ -50,8 +50,8 @@ public class RecipeCollection {
 		
 		//trainingSet.performKNearestNeighbor(testSet, 50, new RecipeCollection.OverlapCoefficient(), false, false, true);
 		
-		RecipeCollection.WeightedOverlapCoefficient weightedOverlapTemp = trainingSet.getWeightedOverlapCoefficient();
-		trainingSet.performKNearestNeighbor(testSet, 5, weightedOverlapTemp, false, false, true);
+		//RecipeCollection.WeightedOverlapCoefficient weightedOverlapTemp = trainingSet.getWeightedOverlapCoefficient();
+		//trainingSet.performKNearestNeighbor(testSet, 5, weightedOverlapTemp, false, false, true);
 		
 	    // Collect Data on different Settings
         try{
