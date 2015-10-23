@@ -21,6 +21,7 @@ public class Ingredient {
 		for(int i = 0; i < cuisineUsage.length; i++)
 			cuisineUsage[i] =0;
 		
+		entropy = -1;
 	}
 	
 	
@@ -91,11 +92,12 @@ public class Ingredient {
 	 * @return double - Value of Ingredient's Entropy
 	 */
 	public double getEntropy(){
-		double p_i;
+		double p_i = 0;
 		
 		// Only calculate entopy once.
 		if( entropy >= 0) return entropy;
 		
+		entropy = 0; // Reset entropy
 		for(int i = 0; i < cuisineUsage.length; i ++){
 			if(cuisineUsage[i] != 0){
 				p_i = (float) cuisineUsage[i] / totalRecipeCount;

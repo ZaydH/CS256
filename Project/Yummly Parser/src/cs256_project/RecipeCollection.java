@@ -22,7 +22,6 @@ public class RecipeCollection {
 	private Hashtable<Integer, Recipe> allRecipes = new Hashtable<Integer,Recipe>();
 	private Hashtable<CuisineType, Integer> cuisineTypeCount = new Hashtable<CuisineType,Integer>();
 	private Hashtable<String, Ingredient> allIngredients = new Hashtable<String,Ingredient>();
-	@SuppressWarnings("unused")
 	private int badRecordCount = 0;
 	ValueDistanceMetricCompare vdmCompare = new ValueDistanceMetricCompare(); 
 	
@@ -41,18 +40,18 @@ public class RecipeCollection {
 		fullCollection.print("filtered_train.json.txt");
 		
 		// Define the training and test sets
-		RecipeCollection[] cols = fullCollection.performRecipeHoldoutSplit((float)6/7);
+		RecipeCollection[] cols = fullCollection.performRecipeHoldoutSplit((float)2/3);
 		RecipeCollection trainingSet = cols[0];
 		RecipeCollection testSet = cols[1];
 		
 		// Perform K-Nearest neighbor on the training sets.
-		RecipeCollection.RecipeDistance valueDist = trainingSet.getValueDistanceMetricCompare();
-		trainingSet.performKNearestNeighbor(testSet, 10, valueDist, true, false, true);
+		//RecipeCollection.RecipeDistance valueDist = trainingSet.getValueDistanceMetricCompare();
+		//trainingSet.performKNearestNeighbor(testSet, 10, valueDist, true, false, true);
 		
 		//trainingSet.performKNearestNeighbor(testSet, 50, new RecipeCollection.OverlapCoefficient(), false, false, true);
 		
-		//RecipeCollection.WeightedOverlapCoefficient weightedOverlap = trainingSet.getWeightedOverlapCoefficient();
-		//RecipeResult result = trainingSet.performKNearestNeighbor(testSet, 5, weightedOverlap);
+		RecipeCollection.WeightedOverlapCoefficient weightedOverlapTemp = trainingSet.getWeightedOverlapCoefficient();
+		trainingSet.performKNearestNeighbor(testSet, 5, weightedOverlapTemp, false, false, true);
 		
 	    // Collect Data on different Settings
         try{
@@ -441,9 +440,10 @@ public class RecipeCollection {
 			
 			@Override
 			public int compareTo(RecipeWrapper other){
-				if(this.distance < other.distance) return -1;
+				/*if(this.distance < other.distance) return -1;
 				else if(this.distance == other.distance) return 0;
-				else return 1;
+				else return 1;*/
+				return Double.compare(this.distance, other.distance);
 			}
 			
 		}
@@ -453,14 +453,13 @@ public class RecipeCollection {
 		Recipe[] trainingRecipes = this.getRecipes();
 		int correctClassifications = 0;
 		int correctFirstOrSecondClassifications = 0;
+		RecipeWrapper[] sortedRecipes = new RecipeWrapper[trainingRecipes.length];
 		for(int i = 0; i < testRecipes.length; i++){
-			
-			RecipeWrapper[] sortedRecipes = new RecipeWrapper[trainingRecipes.length];
 			// Calculate the inter-recipe distance for each recipe and then sort by distance 
 			for(int j = 0; j < trainingRecipes.length; j++){
 				// Determine the distance between 
 				double recipeDistance = dist.compare(testRecipes[i], trainingRecipes[j]);
-				sortedRecipes[j] = new RecipeWrapper(trainingRecipes[j], new Double(recipeDistance));
+				sortedRecipes[j] = new RecipeWrapper(trainingRecipes[j], recipeDistance);
 			}
 			Arrays.sort(sortedRecipes);
 			
@@ -627,22 +626,39 @@ public class RecipeCollection {
 			
 			String[] r1Ingredients = r1.getIngredients();
 			String[] r2Ingredients = r2.getIngredients();
-			int totalMismatches = Math.min(r1Ingredients.length, r2Ingredients.length);
+			Ingredient ingredient;
 			
 			// Iterate through each ingredient list
+			double totalMatches = 0;
 			for(int i = 0; i < r1Ingredients.length; i++){
 				for(int j = 0; j < r2Ingredients.length; j++){
 					if(r1Ingredients[i].equals(r2Ingredients[j])){
-						Ingredient ingredient = allIngredients.get(r1Ingredients[i]);
-						
-						totalMismatches -= 1.0 / (1.0 + ingredient.getEntropy()); // Remove one mismatch
+						ingredient = allIngredients.get(r1Ingredients[i]);
+						if(ingredient == null) continue;
+						totalMatches += 1.0 / (1.0 + ingredient.getEntropy()); // Remove one mismatch
 						break;
 					}
 				}
 			}
 			
+			// Calculate the minimum length between the two recipes
+			double r1Length = 0;
+			for(int i=0; i < r1Ingredients.length; i++){
+				ingredient = allIngredients.get(r1Ingredients[i]);
+				if(ingredient == null) continue;
+				r1Length += 1.0 / (1.0 + ingredient.getEntropy()); // Remove one mismatch
+			}
+			double r2Length = 0;
+			for(int i=0; i < r2Ingredients.length; i++){
+				ingredient = allIngredients.get(r2Ingredients[i]);
+				if(ingredient == null) continue;
+				r2Length += 1.0 / (1.0 + ingredient.getEntropy()); // Remove one mismatch
+			}
+			double minLength =Math.min(r1Length,  r2Length);
+			minLength = Math.min(minLength, 0.1);// Prevent a divide by zero.
+			
 			// Normalize the distance to recipe length.
-			return 1.0* totalMismatches/Math.min(r1Ingredients.length, r2Ingredients.length);
+			return (minLength - totalMatches)/minLength;
 			
 		}
 		
