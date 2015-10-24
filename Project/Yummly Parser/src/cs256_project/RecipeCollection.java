@@ -56,16 +56,13 @@ public class RecipeCollection {
 	    // Collect Data on different Settings
         try{
         	String filePath = "algorithm_comparison.csv";
-			BufferedWriter fileOut = new BufferedWriter(new FileWriter(filePath));
+			BufferedWriter fileOut = new BufferedWriter(new FileWriter(filePath)); // Open the file containing the algorithm comparison results.
 			RecipeResult result;
-			// Put the beginning of the JSON file.
-			fileOut.write("[");
-			fileOut.newLine();
 			
 			// Create a weighted overlap coefficient object
 			RecipeCollection.WeightedOverlapCoefficient weightedOverlap = trainingSet.getWeightedOverlapCoefficient();
 			
-			fileOut.write("Algorithm_Name,K,Use_Weighted_KNN,FirstChoiceAccuracy,TopTwoAccuracy");
+			fileOut.write("Algorithm_Name,K,Use_Weighted_KNN,Use_Class_Probability_Weighting,FirstChoiceAccuracy,TopTwoAccuracy");
 			fileOut.newLine();
 			
 			for(int k =1; k <= 65; k*=2){
