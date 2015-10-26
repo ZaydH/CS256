@@ -46,7 +46,9 @@ public class RecipeCollection {
 		
 		
 		// Perform Naive Bayes Classification
-		trainingSet.performNaiveBayes(testSet, new AccuracyIngredientClassProbability(), true);
+		//trainingSet.performNaiveBayes(testSet, new AccuracyIngredientClassProbability(), true);
+		
+		trainingSet.performNaiveBayes(testSet, new LaplaceIngredientClassProbability(), true);
 		
 		
 		// Perform K-Nearest neighbor on the training sets.
@@ -723,6 +725,10 @@ public class RecipeCollection {
 	 * This class is uses the accuracy metric to determine the conditional
 	 * class probability of the ingredient. 
 	 *
+	 * Conditional Probability for this Class is the simplest and is:
+	 * 
+	 * P(A|C) = attributeClassRecordCount / classRecordCount
+	 *
 	 */
 	public static class AccuracyIngredientClassProbability implements IngredientConditionalProbability{
 		
@@ -733,6 +739,25 @@ public class RecipeCollection {
 		
 	}
 	
+	
+	/**
+	 * 
+	 * This class is uses the Laplace metric to determine the conditional
+	 * class probability of the ingredient. 
+	 * 
+	 * Conditional Probability for this class is:
+	 * 
+	 * P(A|C) = (attributeClassRecordCount + 1) / (classRecordCount + numbCuisineTypes)
+	 *
+	 */
+	public static class LaplaceIngredientClassProbability implements IngredientConditionalProbability{
+		
+		@Override
+		public double calculate(int attributeClassRecordCount, int classRecordCount){
+			return ((double)attributeClassRecordCount +1 )/(classRecordCount + CuisineType.count());
+		}
+		
+	}
 	
 	
 	/**
