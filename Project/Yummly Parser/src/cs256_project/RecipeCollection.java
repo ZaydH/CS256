@@ -35,14 +35,19 @@ public class RecipeCollection {
 			return;
 		}
 		
-		RecipeCollection fullCollection = RecipeCollection.getRecipeCollection("filtered_train.json.txt");
-		//RecipeCollection fullCollection = RecipeCollection.getRecipeCollection(args[0]);
+		//RecipeCollection fullCollection = RecipeCollection.getRecipeCollection("filtered_train.json.txt");
+		RecipeCollection fullCollection = RecipeCollection.getRecipeCollection(args[0]);
 		fullCollection.print("filtered_train.json.txt");
 		
 		// Define the training and test sets
 		RecipeCollection[] cols = fullCollection.performRecipeHoldoutSplit((float)2/3);
 		RecipeCollection trainingSet = cols[0];
 		RecipeCollection testSet = cols[1];
+		
+		
+		// Perform Naive Bayes Classification
+		trainingSet.performNaiveBayes(testSet, new AccuracyIngredientClassProbability(), true);
+		
 		
 		// Perform K-Nearest neighbor on the training sets.
 		//RecipeCollection.RecipeDistance valueDist = trainingSet.getValueDistanceMetricCompare();
@@ -708,6 +713,23 @@ public class RecipeCollection {
 		 * @return							P(A|C) in double form. 
 		 */
 		double calculate(int attributeClassRecordCount, int classRecordCount);
+		
+	}
+	
+	
+	
+	/**
+	 * 
+	 * This class is uses the accuracy metric to determine the conditional
+	 * class probability of the ingredient. 
+	 *
+	 */
+	public static class AccuracyIngredientClassProbability implements IngredientConditionalProbability{
+		
+		@Override
+		public double calculate(int attributeClassRecordCount, int classRecordCount){
+			return ((double)attributeClassRecordCount)/classRecordCount;
+		}
 		
 	}
 	
