@@ -445,7 +445,7 @@ public class RecipeCollection {
 			
 		}
 		
-		RecipeResult results = new RecipeResult();
+		RecipeCollection.RecipeResult results = new RecipeResult();
 		Recipe[] testRecipes = testRecipeCollection.getRecipes();
 		Recipe[] trainingRecipes = this.getRecipes();
 		int correctClassifications = 0;
@@ -522,6 +522,130 @@ public class RecipeCollection {
 		return results;
 		
 	}
+
+	
+	
+	
+	
+	
+	
+	/**
+	 * 
+	 * 
+	 * 
+	 * @param testRecipeCollection	- Collection of Recipes whose class label will be determined.
+	 * @param k						- Value of "K" for K-Nearest Neighbors
+	 * @param dist					- Object that defines how the distance between two recipes is calculated.
+	 * @return
+	 */
+	public RecipeResult performNaiveBayes(RecipeCollection testRecipeCollection, 
+										  IngredientConditionalProbability condProbability,
+										  boolean printIncrementalResults){
+		
+		double[] cuisineTypeProbability = new double[CuisineType.count()];
+		
+		// Determine P(C) for each cuisine type
+		CuisineType tempCT;
+		for(int cnt = 0; cnt < CuisineType.count(); cnt++){
+			tempCT = CuisineType.fromInt(cnt);
+			cuisineTypeProbability[cnt] = ((float)this.cuisineTypeCount.get(tempCT)) / this.cuisineTypeCount.size();
+		}
+		
+		RecipeResult results = new RecipeCollection.RecipeResult();
+		Recipe[] testRecipes = testRecipeCollection.getRecipes();
+		int correctClassifications = 0, correctFirstOrSecondClassifications = 0;
+		Hashtable<String, ArrayList<Double>> allIngredientsClassProbabilities = new Hashtable<String, ArrayList<Double>>();
+		
+		// For each recipe, determine it the class probability
+		Ingredient ingredient;
+		for(int i = 0; i < testRecipes.length; i++){
+			
+			Recipe tempRecipe = testRecipes[i];
+			String ingredientList[] = tempRecipe.getIngredients();
+			double[] recipeBayesProbability = new double[CuisineType.count()]; // Define the recipe Bayes probability for each cuisine type
+			
+			// Start with the Bayes Probability equal to the cuisine type probability
+			for(int cuisineCnt = 0; cuisineCnt < CuisineType.count();  cuisineCnt++)
+				recipeBayesProbability[cuisineCnt] = cuisineTypeProbability[cuisineCnt];
+				
+			// Go through all the ingredients
+			for(int ingredCnt = 0; ingredCnt < ingredientList.length; ingredCnt++){		
+				String ingredName = ingredientList[ingredCnt];
+				
+				// Ensure this ingredient exists in the training set.  Otherwise skip it.
+				ingredient = this.allIngredients.get(ingredName);
+				if(ingredient == null) continue;
+				
+				// Check if the class probabilities for this ingredient have been calculated.
+				ArrayList<Double> ingredientClassProbability = allIngredientsClassProbabilities.get(ingredName);
+				if(ingredientClassProbability == null){
+					
+					// Calculate the class conditional probability.
+					ingredientClassProbability = new ArrayList<Double>();
+					for(int cuisineCnt = 0; cuisineCnt < CuisineType.count();  cuisineCnt++){
+						// Get the cuisine type
+						CuisineType type = CuisineType.fromInt(cuisineCnt);
+						// Calculate the conditional class probability for this ingredient/cuisine type combination
+						double tempProb = condProbability.calculate(ingredient.getCuisineTypeCount(cuisineCnt), 
+																	cuisineTypeCount.get(type));
+						// Store the conditional probability
+						ingredientClassProbability.add(tempProb);
+					}
+					
+					allIngredientsClassProbabilities.put(ingredName, ingredientClassProbability);
+				}
+				
+				// Multiply each class by P(Ingredient | Class)
+				for (int cuisineCnt = 0; cuisineCnt < CuisineType.count(); cuisineCnt++)
+					recipeBayesProbability[cuisineCnt] *= ingredientClassProbability.get(cuisineCnt);
+					
+			}
+			
+			
+			// Find the name of the cuisine types with the highest two scores.
+			int maxId = 0;
+			for(int j = 1; j < CuisineType.count(); j++){
+				if(recipeBayesProbability[j] > recipeBayesProbability[maxId]) maxId = j;
+			}
+			int secondMaxId = (maxId!=0)?0:1;
+			for(int j = secondMaxId + 1; j < CuisineType.count(); j++){
+				if(recipeBayesProbability[j] > recipeBayesProbability[secondMaxId] && j!=maxId) secondMaxId = j;
+			}
+				
+			// Get the name of the cuisine type that corresponds with this ordinal number
+			String firstCuisineType = CuisineType.fromInt(maxId).name();
+			String secondCuisineType = CuisineType.fromInt(secondMaxId).name();
+			
+			// Check if the classification is correct
+			if(firstCuisineType.equals(testRecipes[i].getCuisineType())){
+				correctClassifications++;
+				correctFirstOrSecondClassifications++;
+			}
+			// Check if the second best selection is correct.
+			else if(secondCuisineType.equals(testRecipes[i].getCuisineType())){
+				correctFirstOrSecondClassifications++;
+			}
+			
+			if(printIncrementalResults){
+				if(i > 0 && i % 25 == 0){
+					System.out.println(i + " out of " + testRecipes.length + " have been completed.");
+					System.out.println("First place accuracy so far: " + String.format("%9.2f", 100.0 * correctClassifications/(i+1)) + "%.");
+					System.out.println("Two two accuracy so far: " + String.format("%9.2f", 100.0 * correctFirstOrSecondClassifications/(i+1)) + "%.\n\n");
+				}
+			}
+		}
+		
+		// Calculate the overall accuracy
+		results.setAccuracy((double)correctClassifications/testRecipes.length);
+		results.setTopTwoAccuracy((double)correctFirstOrSecondClassifications/testRecipes.length);
+
+		return results;
+		
+	}
+	
+	
+	
+	
 	
 
 	public class RecipeResult {
@@ -567,6 +691,25 @@ public class RecipeCollection {
 		double compare(Recipe r1, Recipe r2);
 	}
 	
+	
+	
+	/**
+	 * 
+	 * This interface type is used to allow for different approaches 
+	 * to calculate the conditional probability of a given ingredient.
+	 *
+	 */
+	public interface IngredientConditionalProbability{
+		
+		/**
+		 * 
+		 * @param attributeClassRecordCount	Total number of records from the specified class with this attribute value.
+		 * @param classRecordCount			Total number of records of the specified class.
+		 * @return							P(A|C) in double form. 
+		 */
+		double calculate(int attributeClassRecordCount, int classRecordCount);
+		
+	}
 	
 	
 	
