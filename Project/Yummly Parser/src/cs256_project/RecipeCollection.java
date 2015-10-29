@@ -28,6 +28,8 @@ public class RecipeCollection {
 	
 	private static final int MINIMUM_RECIPE_SIZE = 4;
 	
+	private static final int INCREMENTAL_PRINT_FREQUENCY = 1000;
+	
 	public static void main(String[] args){
 		
 		if(args.length != 1){
@@ -48,7 +50,7 @@ public class RecipeCollection {
 		// Perform Naive Bayes Classification
 		//trainingSet.performNaiveBayes(testSet, new AccuracyIngredientClassProbability(), true);
 		
-		trainingSet.performNaiveBayes(testSet, new LaplaceIngredientClassProbability(), true);
+		RecipeResult naiveBayesResult = trainingSet.performNaiveBayes(testSet, new LaplaceIngredientClassProbability(), true);
 		
 		
 		// Perform K-Nearest neighbor on the training sets.
@@ -57,8 +59,10 @@ public class RecipeCollection {
 		
 		//trainingSet.performKNearestNeighbor(testSet, 50, new RecipeCollection.OverlapCoefficient(), false, false, true);
 		
-		//RecipeCollection.WeightedOverlapCoefficient weightedOverlapTemp = trainingSet.getWeightedOverlapCoefficient();
-		//trainingSet.performKNearestNeighbor(testSet, 5, weightedOverlapTemp, false, false, true);
+		RecipeCollection.WeightedOverlapCoefficient weightedOverlapTemp = trainingSet.getWeightedOverlapCoefficient();
+		RecipeResult knnResult = trainingSet.performKNearestNeighbor(testSet, 8, weightedOverlapTemp, false, false, true);
+		
+		testSet.performKNNandBayesEnsemble(knnResult, naiveBayesResult, true);
 		
 	    // Collect Data on different Settings
         try{
@@ -476,7 +480,7 @@ public class RecipeCollection {
 					recipeCuisineScore[type.ordinal()] += 1.0 / Math.pow(sortedRecipes[j].getDistance(),2);
 				}
 				else{
-					recipeCuisineScore[type.ordinal()]++;
+					recipeCuisineScore[type.ordinal()]+=1.0;
 				}
 			}
 			
@@ -514,12 +518,21 @@ public class RecipeCollection {
 			}
 			
 			if(printIncrementalResults){
-				if(i > 0 && i % 25 == 0){
+				if(i > 0 && i % INCREMENTAL_PRINT_FREQUENCY == 0){
 					System.out.println(i + " out of " + testRecipes.length + " have been completed.");
 					System.out.println("First place accuracy so far: " + String.format("%9.2f", 100.0 * correctClassifications/(i+1)) + "%.");
 					System.out.println("Two two accuracy so far: " + String.format("%9.2f", 100.0 * correctFirstOrSecondClassifications/(i+1)) + "%.\n\n");
 				}
 			}
+			
+			// Normalize the cuisine score between 0 and 1
+			Double[] normalizedKNNScore = new Double[recipeCuisineScore.length];
+			double totalKNNScore = 0;
+			for(int cuisineCnt = 0; cuisineCnt < recipeCuisineScore.length; cuisineCnt++)
+				totalKNNScore += recipeCuisineScore[cuisineCnt];
+			for(int cuisineCnt = 0; cuisineCnt < recipeCuisineScore.length; cuisineCnt++)
+				normalizedKNNScore[cuisineCnt] = recipeCuisineScore[cuisineCnt] /totalKNNScore;
+			results.addTestResult(testRecipes[i].getID(), normalizedKNNScore);
 		}
 		
 		// Calculate the overall accuracy
@@ -532,6 +545,64 @@ public class RecipeCollection {
 
 	
 	
+	
+	public void performKNNandBayesEnsemble(RecipeResult knnResult, RecipeResult bayesResult, boolean printIncrementalResults){
+		
+		Recipe[] testRecipes = this.getRecipes();
+		int correctClassifications = 0;
+		int correctFirstOrSecondClassifications = 0;
+		
+		
+		for(int i = 0; i < testRecipes.length; i++){
+			
+			// Get the info on the test recipe
+			int recipeID = testRecipes[i].getID();
+			
+			// Get the scores from KNN and Naive Bayes
+			Double[] knnScores = knnResult.getTestResult(recipeID);
+			Double[] bayesScores = bayesResult.getTestResult(recipeID);
+			
+			// Determine the combined scores
+			double[] combinedScores = new double[bayesScores.length];
+			for(int cuisineCnt = 0; cuisineCnt < knnScores.length; cuisineCnt++)
+				combinedScores[cuisineCnt] = knnScores[cuisineCnt] + bayesScores[cuisineCnt];
+			
+			// Find the name of the cuisine types with the highest two scores.
+			int maxId = 0;
+			for(int j = 1; j < CuisineType.count(); j++){
+				if(combinedScores[j] > combinedScores[maxId]) maxId = j;
+			}
+			int secondMaxId = (maxId!=0)?0:1;
+			for(int j = secondMaxId + 1; j < CuisineType.count(); j++){
+				if(combinedScores[j] > combinedScores[secondMaxId] && j!=maxId) secondMaxId = j;
+			}
+				
+			// Get the name of the cuisine type that corresponds with this ordinal number
+			String firstCuisineType = CuisineType.fromInt(maxId).name();
+			String secondCuisineType = CuisineType.fromInt(secondMaxId).name();
+			
+			// Check if the classification is correct
+			if(firstCuisineType.equals(testRecipes[i].getCuisineType())){
+				correctClassifications++;
+				correctFirstOrSecondClassifications++;
+			}
+			// Check if the second best selection is correct.
+			else if(secondCuisineType.equals(testRecipes[i].getCuisineType())){
+				correctFirstOrSecondClassifications++;
+			}
+			
+			if(printIncrementalResults){
+				if(i > 0 && i % INCREMENTAL_PRINT_FREQUENCY == 0){
+					System.out.println(i + " out of " + testRecipes.length + " have been completed.");
+					System.out.println("First place accuracy so far: " + String.format("%9.2f", 100.0 * correctClassifications/(i+1)) + "%.");
+					System.out.println("Two two accuracy so far: " + String.format("%9.2f", 100.0 * correctFirstOrSecondClassifications/(i+1)) + "%.\n\n");
+				}
+			}
+			
+			
+		}
+		
+	}
 	
 	
 	
@@ -549,14 +620,15 @@ public class RecipeCollection {
 										  IngredientConditionalProbability condProbability,
 										  boolean printIncrementalResults){
 		
-		double[] cuisineTypeProbability = new double[CuisineType.count()];
 		
-		// Determine P(C) for each cuisine type
+		
+		/*// Determine P(C) for each cuisine type
+		double[] cuisineTypeProbability = new double[CuisineType.count()];
 		CuisineType tempCT;
 		for(int cnt = 0; cnt < CuisineType.count(); cnt++){
 			tempCT = CuisineType.fromInt(cnt);
 			cuisineTypeProbability[cnt] = ((float)this.cuisineTypeCount.get(tempCT)) / this.cuisineTypeCount.size();
-		}
+		}*/
 		
 		RecipeResult results = new RecipeCollection.RecipeResult();
 		Recipe[] testRecipes = testRecipeCollection.getRecipes();
@@ -572,8 +644,12 @@ public class RecipeCollection {
 			double[] recipeBayesProbability = new double[CuisineType.count()]; // Define the recipe Bayes probability for each cuisine type
 			
 			// Start with the Bayes Probability equal to the cuisine type probability
-			for(int cuisineCnt = 0; cuisineCnt < CuisineType.count();  cuisineCnt++)
-				recipeBayesProbability[cuisineCnt] = cuisineTypeProbability[cuisineCnt];
+			CuisineType tempCT;
+			for(int cuisineCnt = 0; cuisineCnt < CuisineType.count();  cuisineCnt++){
+				//recipeBayesProbability[cuisineCnt] = cuisineTypeProbability[cuisineCnt];
+				tempCT = CuisineType.fromInt(cuisineCnt);
+				recipeBayesProbability[cuisineCnt] = this.cuisineTypeCount.get(tempCT);
+			}
 				
 			// Go through all the ingredients
 			for(int ingredCnt = 0; ingredCnt < ingredientList.length; ingredCnt++){		
@@ -634,12 +710,21 @@ public class RecipeCollection {
 			}
 			
 			if(printIncrementalResults){
-				if(i > 0 && i % 25 == 0){
+				if(i > 0 && i % INCREMENTAL_PRINT_FREQUENCY == 0){
 					System.out.println(i + " out of " + testRecipes.length + " have been completed.");
 					System.out.println("First place accuracy so far: " + String.format("%9.2f", 100.0 * correctClassifications/(i+1)) + "%.");
 					System.out.println("Two two accuracy so far: " + String.format("%9.2f", 100.0 * correctFirstOrSecondClassifications/(i+1)) + "%.\n\n");
 				}
 			}
+			
+			// Normalize the Bayesian probability between 0 and 1
+			Double[] normalizedBayesScore = new Double[recipeBayesProbability.length];
+			double totalBayesProbability = 0;
+			for(int cuisineCnt = 0; cuisineCnt < recipeBayesProbability.length; cuisineCnt++)
+				totalBayesProbability += recipeBayesProbability[cuisineCnt];
+			for(int cuisineCnt = 0; cuisineCnt < recipeBayesProbability.length; cuisineCnt++)
+				normalizedBayesScore[cuisineCnt] = recipeBayesProbability[cuisineCnt] /totalBayesProbability;
+			results.addTestResult(tempRecipe.getID(), normalizedBayesScore);
 		}
 		
 		// Calculate the overall accuracy
@@ -660,12 +745,17 @@ public class RecipeCollection {
 		double accuracy;
 		double topTwoAccuracy;// This is the combined accuracy of the first and second choice.
 		
+		public Hashtable<Integer, Double[]> testResult = new Hashtable<Integer, Double[]>();
+		
 		
 		public double getAccuracy(){ return accuracy; }
 		public void setAccuracy(double accuracy){ this.accuracy = accuracy; }
 		
 		public double getTopTwoAccuracy(){ return topTwoAccuracy; }
 		public void setTopTwoAccuracy(double topTwoAccuracy){ this.topTwoAccuracy = topTwoAccuracy; }
+		
+		public void addTestResult(int recipeID, Double[] results){ testResult.put(new Integer(recipeID), results); }
+		public Double[] getTestResult(int recipeID){ return testResult.get(recipeID); }
 		
 	}
 
