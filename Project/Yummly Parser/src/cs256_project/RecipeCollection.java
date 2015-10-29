@@ -37,71 +37,43 @@ public class RecipeCollection {
 			return;
 		}
 		
-		//RecipeCollection fullCollection = RecipeCollection.getRecipeCollection("filtered_train.json.txt");
-		RecipeCollection fullCollection = RecipeCollection.getRecipeCollection(args[0]);
-		fullCollection.print("filtered_train.json.txt");
-		
-		// Define the training and test sets
-		RecipeCollection[] cols = fullCollection.performRecipeHoldoutSplit((float)2/3);
-		RecipeCollection trainingSet = cols[0];
-		RecipeCollection testSet = cols[1];
-		
-		
-		// Perform Naive Bayes Classification
-		//trainingSet.performNaiveBayes(testSet, new AccuracyIngredientClassProbability(), true);
-		
-		RecipeResult naiveBayesResult = trainingSet.performNaiveBayes(testSet, new LaplaceIngredientClassProbability(), true);
-		
-		
-		// Perform K-Nearest neighbor on the training sets.
-		//RecipeCollection.RecipeDistance valueDist = trainingSet.getValueDistanceMetricCompare();
-		//trainingSet.performKNearestNeighbor(testSet, 10, valueDist, true, false, true);
-		
-		//trainingSet.performKNearestNeighbor(testSet, 50, new RecipeCollection.OverlapCoefficient(), false, false, true);
-		
-		RecipeCollection.WeightedOverlapCoefficient weightedOverlapTemp = trainingSet.getWeightedOverlapCoefficient();
-		RecipeResult knnResult = trainingSet.performKNearestNeighbor(testSet, 8, weightedOverlapTemp, false, false, true);
-		
-		testSet.performKNNandBayesEnsemble(knnResult, naiveBayesResult, true);
-		
 	    // Collect Data on different Settings
-        try{
-        	String filePath = "algorithm_comparison.csv";
+		try{
+			String filePath = "algorithm_comparison.csv";
 			BufferedWriter fileOut = new BufferedWriter(new FileWriter(filePath)); // Open the file containing the algorithm comparison results.
 			RecipeResult result;
 			
-			// Create a weighted overlap coefficient object
-			RecipeCollection.WeightedOverlapCoefficient weightedOverlap = trainingSet.getWeightedOverlapCoefficient();
-			
-			fileOut.write("Algorithm_Name,K,Use_Weighted_KNN,Use_Class_Probability_Weighting,FirstChoiceAccuracy,TopTwoAccuracy");
+			fileOut.write("Algorithm_Name,FirstChoiceAccuracy,TopTwoAccuracy");
 			fileOut.newLine();
-			
-			for(int k =1; k <= 65; k*=2){
-				boolean useWeightedKNN;
-				for(int i = 0; i < 2; i++){
-					
-					// Select whether or not to use weighted KNN
-					if(i == 0) useWeightedKNN = false;
-					else 	   useWeightedKNN = true;
-					boolean useClassProbabilityWeighting;
-					for(int j =0; j < 2; j++){
-						
-						if(j == 0) useClassProbabilityWeighting = false;
-						else 	   useClassProbabilityWeighting = true;
-						
-						result = trainingSet.performKNearestNeighbor(testSet, k, weightedOverlap, useWeightedKNN, useClassProbabilityWeighting , false);
-						fileOut.write("weighted_overlap," + k + "," + useWeightedKNN + "," + useClassProbabilityWeighting + "," + result.accuracy + "," + result.topTwoAccuracy);
-						fileOut.newLine();
-					
-						result = trainingSet.performKNearestNeighbor(testSet, k, new RecipeCollection.OverlapCoefficient(), useWeightedKNN,useClassProbabilityWeighting, false);
-						fileOut.write("standard_overlap," + k + "," + useWeightedKNN + "," + useClassProbabilityWeighting + "," + result.accuracy + "," + result.topTwoAccuracy);
-						fileOut.newLine();
-					}
 				
-				}
+			for(int randomSubsamplingCount = 0; randomSubsamplingCount < 1; randomSubsamplingCount++){
 				
+				//RecipeCollection fullCollection = RecipeCollection.getRecipeCollection("filtered_train.json.txt");
+				RecipeCollection fullCollection = RecipeCollection.getRecipeCollection(args[0]);
+				fullCollection.print("filtered_train.json.txt");
+				
+				// Define the training and test sets
+				RecipeCollection[] cols = fullCollection.performRecipeHoldoutSplit((float)2/3);
+				RecipeCollection trainingSet = cols[0];
+				RecipeCollection testSet = cols[1];
+				
+				// Perform Naive Bayes
+				RecipeResult naiveBayesResult = trainingSet.performNaiveBayes(testSet, new LaplaceIngredientClassProbability(), true);
+				fileOut.write("NaiveBayes," + naiveBayesResult.accuracy + "," + naiveBayesResult.topTwoAccuracy);
+				fileOut.newLine();
+				
+				// Perform K-Nearest neighbor
+				RecipeCollection.WeightedOverlapCoefficient weightedOverlapTemp = trainingSet.getWeightedOverlapCoefficient();
+				RecipeResult knnResult = trainingSet.performKNearestNeighbor(testSet, 8, weightedOverlapTemp, false, false, true);
+				fileOut.write("knnResult," + knnResult.accuracy + "," + knnResult.topTwoAccuracy);
+				fileOut.newLine();
+				
+				// Perform ensemble
+				RecipeResult ensembleResult = testSet.performKNNandBayesEnsemble(knnResult, naiveBayesResult, true);
+				fileOut.write("EnsembleResult," + ensembleResult.accuracy + "," + ensembleResult.topTwoAccuracy);
+				fileOut.newLine();
+
 			}
-			
 			// Put the end of the JSON file then close it.
 			fileOut.close();
 
@@ -546,9 +518,10 @@ public class RecipeCollection {
 	
 	
 	
-	public void performKNNandBayesEnsemble(RecipeResult knnResult, RecipeResult bayesResult, boolean printIncrementalResults){
+	public RecipeResult performKNNandBayesEnsemble(RecipeResult knnResult, RecipeResult bayesResult, boolean printIncrementalResults){
 		
 		Recipe[] testRecipes = this.getRecipes();
+		RecipeCollection.RecipeResult results = new RecipeResult();
 		int correctClassifications = 0;
 		int correctFirstOrSecondClassifications = 0;
 		
@@ -598,9 +571,13 @@ public class RecipeCollection {
 					System.out.println("Two two accuracy so far: " + String.format("%9.2f", 100.0 * correctFirstOrSecondClassifications/(i+1)) + "%.\n\n");
 				}
 			}
-			
-			
 		}
+		
+		// Calculate the overall accuracy
+		results.setAccuracy((double)correctClassifications/testRecipes.length);
+		results.setTopTwoAccuracy((double)correctFirstOrSecondClassifications/testRecipes.length);
+
+		return results;
 		
 	}
 	
