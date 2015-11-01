@@ -41,12 +41,11 @@ public class RecipeCollection {
 		try{
 			String filePath = "algorithm_comparison.csv";
 			BufferedWriter fileOut = new BufferedWriter(new FileWriter(filePath)); // Open the file containing the algorithm comparison results.
-			RecipeResult result;
-			
+
 			fileOut.write("Algorithm_Name,FirstChoiceAccuracy,TopTwoAccuracy");
 			fileOut.newLine();
 				
-			for(int randomSubsamplingCount = 0; randomSubsamplingCount < 1; randomSubsamplingCount++){
+			for(int randomSubsamplingCount = 0; randomSubsamplingCount < 33; randomSubsamplingCount++){
 				
 				//RecipeCollection fullCollection = RecipeCollection.getRecipeCollection("filtered_train.json.txt");
 				RecipeCollection fullCollection = RecipeCollection.getRecipeCollection(args[0]);
@@ -62,16 +61,30 @@ public class RecipeCollection {
 				fileOut.write("NaiveBayes," + naiveBayesResult.accuracy + "," + naiveBayesResult.topTwoAccuracy);
 				fileOut.newLine();
 				
-				// Perform K-Nearest neighbor
-				RecipeCollection.WeightedOverlapCoefficient weightedOverlapTemp = trainingSet.getWeightedOverlapCoefficient();
-				RecipeResult knnResult = trainingSet.performKNearestNeighbor(testSet, 8, weightedOverlapTemp, false, false, true);
-				fileOut.write("knnResult," + knnResult.accuracy + "," + knnResult.topTwoAccuracy);
+				// Perform K-Nearest neighbor using Modified Value Distance Metric
+				RecipeCollection.ValueDistanceMetricCompare mvdmCompare = trainingSet.getValueDistanceMetricCompare();
+				RecipeResult mvdmKnnResult = trainingSet.performKNearestNeighbor(testSet, 8, mvdmCompare, false, false, true);
+				fileOut.write("MVDMKnnResult," + mvdmKnnResult.accuracy + "," + mvdmKnnResult.topTwoAccuracy);
 				fileOut.newLine();
 				
+				// Perform K-Nearest neighbor using Weighted Overlap
+				RecipeCollection.WeightedOverlapCoefficient weightedOverlapTemp = trainingSet.getWeightedOverlapCoefficient();
+				RecipeResult knnResultWeightedOverlap = trainingSet.performKNearestNeighbor(testSet, 8, weightedOverlapTemp, false, false, true);
+				fileOut.write("WeightedOverlapKnnResult," + knnResultWeightedOverlap.accuracy + "," + knnResultWeightedOverlap.topTwoAccuracy);
+				fileOut.newLine();
+				
+				RecipeResult[] combinedResults = new RecipeResult[3];
+				int cnt = 0;
+				combinedResults[cnt++] = knnResultWeightedOverlap;
+				combinedResults[cnt++] = mvdmKnnResult;
+				combinedResults[cnt++] = naiveBayesResult;
+				
 				// Perform ensemble
-				RecipeResult ensembleResult = testSet.performKNNandBayesEnsemble(knnResult, naiveBayesResult, true);
+				RecipeResult ensembleResult = testSet.performKNNandBayesEnsemble(combinedResults, true);
 				fileOut.write("EnsembleResult," + ensembleResult.accuracy + "," + ensembleResult.topTwoAccuracy);
 				fileOut.newLine();
+				
+
 
 			}
 			// Put the end of the JSON file then close it.
@@ -498,7 +511,7 @@ public class RecipeCollection {
 			}
 			
 			// Normalize the cuisine score between 0 and 1
-			Double[] normalizedKNNScore = new Double[recipeCuisineScore.length];
+			double[] normalizedKNNScore = new double[recipeCuisineScore.length];
 			double totalKNNScore = 0;
 			for(int cuisineCnt = 0; cuisineCnt < recipeCuisineScore.length; cuisineCnt++)
 				totalKNNScore += recipeCuisineScore[cuisineCnt];
@@ -518,7 +531,7 @@ public class RecipeCollection {
 	
 	
 	
-	public RecipeResult performKNNandBayesEnsemble(RecipeResult knnResult, RecipeResult bayesResult, boolean printIncrementalResults){
+	public RecipeResult performKNNandBayesEnsemble(RecipeResult[] inputResults, boolean printIncrementalResults){
 		
 		Recipe[] testRecipes = this.getRecipes();
 		RecipeCollection.RecipeResult results = new RecipeResult();
@@ -531,14 +544,13 @@ public class RecipeCollection {
 			// Get the info on the test recipe
 			int recipeID = testRecipes[i].getID();
 			
-			// Get the scores from KNN and Naive Bayes
-			Double[] knnScores = knnResult.getTestResult(recipeID);
-			Double[] bayesScores = bayesResult.getTestResult(recipeID);
-			
 			// Determine the combined scores
-			double[] combinedScores = new double[bayesScores.length];
-			for(int cuisineCnt = 0; cuisineCnt < knnScores.length; cuisineCnt++)
-				combinedScores[cuisineCnt] = knnScores[cuisineCnt] + bayesScores[cuisineCnt];
+			double[] combinedScores = new double[CuisineType.count()];
+			for(int resultCnt = 0; resultCnt < inputResults.length; resultCnt++){
+				double[] tempScores = inputResults[resultCnt].getTestResult(recipeID); 
+				for(int cuisineCnt = 0; cuisineCnt < CuisineType.count(); cuisineCnt++)
+					combinedScores[cuisineCnt] += tempScores[cuisineCnt];
+			}
 			
 			// Find the name of the cuisine types with the highest two scores.
 			int maxId = 0;
@@ -695,7 +707,7 @@ public class RecipeCollection {
 			}
 			
 			// Normalize the Bayesian probability between 0 and 1
-			Double[] normalizedBayesScore = new Double[recipeBayesProbability.length];
+			double[] normalizedBayesScore = new double[recipeBayesProbability.length];
 			double totalBayesProbability = 0;
 			for(int cuisineCnt = 0; cuisineCnt < recipeBayesProbability.length; cuisineCnt++)
 				totalBayesProbability += recipeBayesProbability[cuisineCnt];
@@ -722,7 +734,7 @@ public class RecipeCollection {
 		double accuracy;
 		double topTwoAccuracy;// This is the combined accuracy of the first and second choice.
 		
-		public Hashtable<Integer, Double[]> testResult = new Hashtable<Integer, Double[]>();
+		public Hashtable<Integer, double[]> testResult = new Hashtable<Integer, double[]>();
 		
 		
 		public double getAccuracy(){ return accuracy; }
@@ -731,8 +743,8 @@ public class RecipeCollection {
 		public double getTopTwoAccuracy(){ return topTwoAccuracy; }
 		public void setTopTwoAccuracy(double topTwoAccuracy){ this.topTwoAccuracy = topTwoAccuracy; }
 		
-		public void addTestResult(int recipeID, Double[] results){ testResult.put(new Integer(recipeID), results); }
-		public Double[] getTestResult(int recipeID){ return testResult.get(recipeID); }
+		public void addTestResult(int recipeID, double[] results){ testResult.put(new Integer(recipeID), results); }
+		public double[] getTestResult(int recipeID){ return testResult.get(recipeID); }
 		
 	}
 
