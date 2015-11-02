@@ -23,7 +23,7 @@ public class RecipeCollection {
 	private Hashtable<CuisineType, Integer> cuisineTypeCount = new Hashtable<CuisineType,Integer>();
 	private Hashtable<String, Ingredient> allIngredients = new Hashtable<String,Ingredient>();
 	private int badRecordCount = 0;
-	ValueDistanceMetricCompare vdmCompare = new ValueDistanceMetricCompare(); 
+	ValueDifferenceMetricCompare vdmCompare = new ValueDifferenceMetricCompare(); 
 	
 	
 	private static final int MINIMUM_RECIPE_SIZE = 4;
@@ -62,7 +62,7 @@ public class RecipeCollection {
 				fileOut.newLine();
 				
 				// Perform K-Nearest neighbor using Modified Value Distance Metric
-				RecipeCollection.ValueDistanceMetricCompare mvdmCompare = trainingSet.getValueDistanceMetricCompare();
+				RecipeCollection.ValueDifferenceMetricCompare mvdmCompare = trainingSet.getValueDifferenceMetricCompare();
 				RecipeResult mvdmKnnResult = trainingSet.performKNearestNeighbor(testSet, 8, mvdmCompare, false, false, true);
 				fileOut.write("MVDMKnnResult," + mvdmKnnResult.accuracy + "," + mvdmKnnResult.topTwoAccuracy);
 				fileOut.newLine();
@@ -401,7 +401,7 @@ public class RecipeCollection {
 	}
 	
 	
-	public ValueDistanceMetricCompare getValueDistanceMetricCompare(){return vdmCompare;}
+	public ValueDifferenceMetricCompare getValueDifferenceMetricCompare(){return vdmCompare;}
 	public WeightedOverlapCoefficient getWeightedOverlapCoefficient(){ return new WeightedOverlapCoefficient(); }
 	
 	/**
@@ -938,7 +938,7 @@ public class RecipeCollection {
 	 * two recipes in the collection.
 	 *
 	 */
-	public class ValueDistanceMetricCompare implements RecipeDistance{
+	public class ValueDifferenceMetricCompare implements RecipeDistance{
 		
 		Hashtable<String, Double> ingredientDistance = new Hashtable<String, Double>();
 		
@@ -946,9 +946,7 @@ public class RecipeCollection {
 		
 		@Override
 		public double compare(Recipe r1, Recipe r2){
-			
-			
-			
+
 			double totalDistance = 0;
 			double calculatedDistance;
 			Double storedDistance;
@@ -982,7 +980,7 @@ public class RecipeCollection {
 						continue;
 					}
 					
-					// See if the ingredient distance is store
+					// See if the ingredient distance is stored
 					storedDistance = ingredientDistance.get(getKeyName(i1Name, i2Name));
 					if(storedDistance != null){
 						totalDistance += storedDistance.doubleValue();
@@ -990,13 +988,15 @@ public class RecipeCollection {
 					}
 					
 					// Ingredient distance is not stored so calculate it.
-					calculatedDistance = 0;
+					calculatedDistance = 0.0;
+					int[] i1CuisineCounts = i1.getAllCuisineTypesCount();
+					int[] i2CuisineCounts = i2.getAllCuisineTypesCount();
 					for(int k = 0; k < CuisineType.count(); k++){
-						calculatedDistance += Math.abs((double)(i1.getCuisineTypeCount(k))/i1.getTotalRecipeCount() 
-												       - (double)(i2.getCuisineTypeCount(k))/i2.getTotalRecipeCount());
+						calculatedDistance += Math.abs((1.0 * i1CuisineCounts[k])/i1.getTotalRecipeCount() 
+												       - (1.0*i2CuisineCounts[k])/i2.getTotalRecipeCount());
 					}
 					// Store the inter-ingredient distance in the collection.
-					storedDistance = calculatedDistance; // Convert to a Wrapper Double object (i.e. non-double primitive)
+					storedDistance = new Double(calculatedDistance); // Convert to a Wrapper Double object (i.e. non-double primitive)
 					ingredientDistance.put(getKeyName(i1Name, i2Name), storedDistance);
 					totalDistance += calculatedDistance;
 				}
@@ -1007,9 +1007,8 @@ public class RecipeCollection {
 				totalDistance /= (r1Ingredients.length * r2Ingredients.length - illegalIngredientPairs);
 			else
 				totalDistance = Double.MAX_VALUE;
-			
-			//RecipeDistance oc = new OverlapCoefficient();
-			return totalDistance;// * oc.compare(r1, r2);
+			// Return the total distance
+			return totalDistance;
 			
 		}
 		
