@@ -42,51 +42,69 @@ public class RecipeCollection {
 			String filePath = "algorithm_comparison.csv";
 			BufferedWriter fileOut = new BufferedWriter(new FileWriter(filePath)); // Open the file containing the algorithm comparison results.
 
-			fileOut.write("Algorithm_Name,FirstChoiceAccuracy,TopTwoAccuracy");
+			fileOut.write("Algorithm_Name,k,FirstChoiceAccuracy,TopTwoAccuracy");
 			fileOut.newLine();
-				
-			for(int randomSubsamplingCount = 0; randomSubsamplingCount < 33; randomSubsamplingCount++){
-				
-				//RecipeCollection fullCollection = RecipeCollection.getRecipeCollection("filtered_train.json.txt");
-				RecipeCollection fullCollection = RecipeCollection.getRecipeCollection(args[0]);
-				fullCollection.print("filtered_train.json.txt");
-				
-				// Define the training and test sets
-				RecipeCollection[] cols = fullCollection.performRecipeHoldoutSplit((float)2/3);
-				RecipeCollection trainingSet = cols[0];
-				RecipeCollection testSet = cols[1];
-				
-				// Perform Naive Bayes
-				RecipeResult naiveBayesResult = trainingSet.performNaiveBayes(testSet, new LaplaceIngredientClassProbability(), true);
-				fileOut.write("NaiveBayes," + naiveBayesResult.accuracy + "," + naiveBayesResult.topTwoAccuracy);
-				fileOut.newLine();
-				
-				// Perform K-Nearest neighbor using Modified Value Distance Metric
-				RecipeCollection.ValueDifferenceMetricCompare mvdmCompare = trainingSet.getValueDifferenceMetricCompare();
-				RecipeResult mvdmKnnResult = trainingSet.performKNearestNeighbor(testSet, 8, mvdmCompare, false, false, true);
-				fileOut.write("MVDMKnnResult," + mvdmKnnResult.accuracy + "," + mvdmKnnResult.topTwoAccuracy);
-				fileOut.newLine();
-				
-				// Perform K-Nearest neighbor using Weighted Overlap
-				RecipeCollection.WeightedOverlapCoefficient weightedOverlapTemp = trainingSet.getWeightedOverlapCoefficient();
-				RecipeResult knnResultWeightedOverlap = trainingSet.performKNearestNeighbor(testSet, 8, weightedOverlapTemp, false, false, true);
-				fileOut.write("WeightedOverlapKnnResult," + knnResultWeightedOverlap.accuracy + "," + knnResultWeightedOverlap.topTwoAccuracy);
-				fileOut.newLine();
-				
-				RecipeResult[] combinedResults = new RecipeResult[3];
-				int cnt = 0;
-				combinedResults[cnt++] = knnResultWeightedOverlap;
-				combinedResults[cnt++] = mvdmKnnResult;
-				combinedResults[cnt++] = naiveBayesResult;
-				
-				// Perform ensemble
-				RecipeResult ensembleResult = testSet.performKNNandBayesEnsemble(combinedResults, true);
-				fileOut.write("EnsembleResult," + ensembleResult.accuracy + "," + ensembleResult.topTwoAccuracy);
-				fileOut.newLine();
-				
-
-
-			}
+			
+			for(int k = 1; k <=64; k*=2)
+				for(int randomSubsamplingCount = 0; randomSubsamplingCount < 33; randomSubsamplingCount++){
+					
+					//RecipeCollection fullCollection = RecipeCollection.getRecipeCollection("filtered_train.json.txt");
+					RecipeCollection fullCollection = RecipeCollection.getRecipeCollection(args[0]);
+					fullCollection.print("filtered_train.json.txt");
+					
+					// Define the training and test sets
+					RecipeCollection[] cols = fullCollection.performRecipeHoldoutSplit((float)2/3);
+					RecipeCollection trainingSet = cols[0];
+					RecipeCollection testSet = cols[1];
+					
+					/*// Perform K-Nearest neighbor using Weighted Overlap
+					RecipeCollection.OverlapCoefficientAmalgamated  amalOverlap = new RecipeCollection.OverlapCoefficientAmalgamated();
+					RecipeResult knnAmalOverlap = trainingSet.performKNearestNeighbor(testSet, k, amalOverlap, false, false, true);
+					fileOut.write("AmalOverlap," + k + "," + knnAmalOverlap.accuracy + "," + knnAmalOverlap.topTwoAccuracy);
+					fileOut.newLine();*/
+					
+					// Perform K-Nearest neighbor using Weighted Overlap
+					RecipeCollection.WeightedOverlapCoefficient weightedOverlapTemp = trainingSet.getWeightedOverlapCoefficient();
+					RecipeResult knnResultWeightedOverlap = trainingSet.performKNearestNeighbor(testSet, 8, weightedOverlapTemp, false, false, true);
+					fileOut.write("WeightedOverlapKnnResult," + k + "," + knnResultWeightedOverlap.accuracy + "," + knnResultWeightedOverlap.topTwoAccuracy);
+					fileOut.newLine();
+					
+					RecipeCollection.AmalgamatedWeightedOverlapCoefficient amalWeightedOverlap = trainingSet.getAmalgamatedWeightedOverlapCoefficient();
+					RecipeResult knnAmalWeightedOverlap = trainingSet.performKNearestNeighbor(testSet, k, amalWeightedOverlap, false, false, true);
+					fileOut.write("AmalgamatedWeightedOverlap," + k + "," + knnAmalWeightedOverlap.accuracy + "," + knnAmalWeightedOverlap.topTwoAccuracy);
+					fileOut.newLine();
+					
+					/*// Perform Naive Bayes
+					RecipeResult naiveBayesResult = trainingSet.performNaiveBayes(testSet, new LaplaceIngredientClassProbability(), true);
+					fileOut.write("NaiveBayes," + naiveBayesResult.accuracy + "," + naiveBayesResult.topTwoAccuracy);
+					fileOut.newLine();
+					
+					// Perform K-Nearest neighbor using Modified Value Distance Metric
+					RecipeCollection.ValueDifferenceMetricCompare mvdmCompare = trainingSet.getValueDifferenceMetricCompare();
+					RecipeResult mvdmKnnResult = trainingSet.performKNearestNeighbor(testSet, 8, mvdmCompare, false, false, true);
+					fileOut.write("MVDMKnnResult," + mvdmKnnResult.accuracy + "," + mvdmKnnResult.topTwoAccuracy);
+					fileOut.newLine();
+					
+					// Perform K-Nearest neighbor using Weighted Overlap
+					RecipeCollection.WeightedOverlapCoefficient weightedOverlapTemp = trainingSet.getWeightedOverlapCoefficient();
+					RecipeResult knnResultWeightedOverlap = trainingSet.performKNearestNeighbor(testSet, 8, weightedOverlapTemp, false, false, true);
+					fileOut.write("WeightedOverlapKnnResult," + knnResultWeightedOverlap.accuracy + "," + knnResultWeightedOverlap.topTwoAccuracy);
+					fileOut.newLine();
+					
+					RecipeResult[] combinedResults = new RecipeResult[3];
+					int cnt = 0;
+					combinedResults[cnt++] = knnResultWeightedOverlap;
+					combinedResults[cnt++] = mvdmKnnResult;
+					combinedResults[cnt++] = naiveBayesResult;
+					
+					// Perform ensemble
+					RecipeResult ensembleResult = testSet.performKNNandBayesEnsemble(combinedResults, true);
+					fileOut.write("EnsembleResult," + ensembleResult.accuracy + "," + ensembleResult.topTwoAccuracy);
+					fileOut.newLine();*/
+					
+	
+	
+				}
 			// Put the end of the JSON file then close it.
 			fileOut.close();
 
@@ -183,6 +201,15 @@ public class RecipeCollection {
 
 			} //if(line.indexOf(RECORD_END_CHAR) > 0 )
 		} //while(fileIn.hasNextLine())
+		
+		/*int[] wordCount = new int[25];
+		int[] totalIngredientWordCount = new int[25];
+        Set<String> keys = tempRC.allIngredients.keySet();
+		for(String key : keys){
+			int numbWords = key.split(" ").length;
+			wordCount[numbWords]++;
+			totalIngredientWordCount[numbWords] += tempRC.allIngredients.get(key).getTotalRecipeCount();
+		}*/
 		
 		fileIn.close(); // Close the scanner
 		return tempRC;	// Return the collection of recipe information.
@@ -403,6 +430,7 @@ public class RecipeCollection {
 	
 	public ValueDifferenceMetricCompare getValueDifferenceMetricCompare(){return vdmCompare;}
 	public WeightedOverlapCoefficient getWeightedOverlapCoefficient(){ return new WeightedOverlapCoefficient(); }
+	public AmalgamatedWeightedOverlapCoefficient getAmalgamatedWeightedOverlapCoefficient(){ return new AmalgamatedWeightedOverlapCoefficient(); }
 	
 	/**
 	 * 
@@ -871,6 +899,38 @@ public class RecipeCollection {
 		
 	}
 	
+	/**
+	 * 
+	 * Used as a STRATEGY Method for determining the difference between
+	 * two recipes in the collection.
+	 *
+	 */
+	public static class OverlapCoefficientAmalgamated implements RecipeDistance{
+		
+		@Override
+		public double compare(Recipe r1, Recipe r2){
+			
+			String[] r1Ingredients = r1.getIngredients();
+			String[] r2Ingredients = r2.getIngredients();
+			int totalMismatches = (r1Ingredients.length + r2Ingredients.length);
+			
+			// Iterate through each ingredient list
+			for(int i = 0; i < r1Ingredients.length; i++){
+				for(int j = 0; j < r2Ingredients.length; j++){
+					if(r1Ingredients[i].equals(r2Ingredients[j])){
+						totalMismatches--; // Remove one mismatch
+						break;
+					}
+				}
+			}
+			
+			// Normalize the distance to recipe length.
+			return 1.0* totalMismatches/(r1Ingredients.length + r2Ingredients.length);
+			
+		}
+		
+	}
+	
 	
 	/**
 	 * 
@@ -925,6 +985,52 @@ public class RecipeCollection {
 			
 			// Normalize the distance to recipe length.
 			return (minLength - totalMatches)/minLength;
+			
+		}
+		
+	}
+	
+	
+	public class AmalgamatedWeightedOverlapCoefficient implements RecipeDistance{
+		
+		@Override
+		public double compare(Recipe r1, Recipe r2){
+			
+			String[] r1Ingredients = r1.getIngredients();
+			String[] r2Ingredients = r2.getIngredients();
+			Ingredient ingredient;
+			
+			// Iterate through each ingredient list
+			double totalMatches = 0;
+			for(int i = 0; i < r1Ingredients.length; i++){
+				for(int j = 0; j < r2Ingredients.length; j++){
+					if(r1Ingredients[i].equals(r2Ingredients[j])){
+						ingredient = allIngredients.get(r1Ingredients[i]);
+						if(ingredient == null) continue;
+						totalMatches += 1.0 / (1.0 + ingredient.getEntropy()); // Remove one mismatch
+						break;
+					}
+				}
+			}
+			
+			// Calculate the minimum length between the two recipes
+			double r1Length = 0;
+			for(int i=0; i < r1Ingredients.length; i++){
+				ingredient = allIngredients.get(r1Ingredients[i]);
+				if(ingredient == null) continue;
+				r1Length += 1.0 / (1.0 + ingredient.getEntropy()); // Remove one mismatch
+			}
+			double r2Length = 0;
+			for(int i=0; i < r2Ingredients.length; i++){
+				ingredient = allIngredients.get(r2Ingredients[i]);
+				if(ingredient == null) continue;
+				r2Length += 1.0 / (1.0 + ingredient.getEntropy()); // Remove one mismatch
+			}
+			double totalLength = r1Length + r2Length;
+			totalLength = Math.min(totalLength, 0.0000001);// Prevent a divide by zero.
+			
+			// Normalize the distance to recipe length.
+			return (totalLength - totalMatches)/totalLength;
 			
 		}
 		
